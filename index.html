@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DixDoigts — apprendre à taper à dix doigts</title>
+    <meta name="description" content="Apprends à taper à dix doigts sur un clavier AZERTY : leçons progressives, tests chronométrés, statistiques, badges et certificat. Gratuit, sans compte." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f5bea'/%3E%3Ctext x='32' y='43' font-family='Arial' font-weight='700' font-size='30' text-anchor='middle' fill='white'%3E10%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="top-in">
+        <a class="brand" href="#/"><span class="logo">10</span><span data-app-name>DixDoigts</span></a>
+        <nav class="nav" aria-label="Navigation principale">
+          <a href="#/">Accueil</a>
+          <a href="#/lecons">Leçons</a>
+          <a href="#/test">Test</a>
+          <a href="#/stats">Statistiques</a>
+          <a href="#/badges">Badges</a>
+          <a href="#/certificat">Certificat</a>
+          <a href="#/guide">Guide</a>
+          <a href="#/reglages">Réglages</a>
+        </nav>
+        <span class="chip" id="streak" role="status">🔥 0</span>
+      </div>
+    </header>
+    <div class="mobile-note">Ce site s'utilise avec un clavier physique : ouvre-le sur un ordinateur.</div>
+    <div class="banner notice warn" id="banner" hidden></div>
+    <noscript><div class="notice warn">Ce site a besoin de JavaScript pour fonctionner.</div></noscript>
+    <main id="app"></main>
+    <footer class="foot">
+      <span data-app-name>DixDoigts</span> · Ta progression reste dans ton navigateur, sans compte ni suivi. MPM = mots par minute (1 mot = 5 caractères).
+    </footer>
+    <div id="toasts" aria-live="polite"></div>
+
+    <script src="js/util.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/layout.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/words.js"></script>
+    <script src="js/curriculum.js"></script>
+    <script src="js/keyboard.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/pdf.js"></script>
+    <script src="js/badges.js"></script>
+    <script src="js/typing.js"></script>
+    <script src="js/view-learn.js"></script>
+    <script src="js/view-test.js"></script>
+    <script src="js/view-data.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
