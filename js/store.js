@@ -9,9 +9,23 @@
     return /mac|iphone|ipad/i.test(p) ? 'mac' : 'pc';
   }
 
+  // v      : version du format de fichier (reste 1, pour que les anciennes sauvegardes s'importent toujours).
+  // schema : version de la structure des leçons. 1 = leçons à plat ; 2 = leçons en étapes + fin de module.
+  const SCHEMA = 2;
+  const END_STEPS = ['e1', 'e2', 'e3', 'mastery', 'revision'];
+  const WORKSHOP_TYPES = ['repeat', 'alternate', 'pseudo', 'words', 'mix'];
+  // Leçons de l'ancienne structure (schéma 1) : sert à garder les modules déjà terminés.
+  const LEGACY_LESSONS = {
+    1: ['1.1', '1.2', '1.3', '1.4', '1.5', '1.6'], 2: ['2.1', '2.2', '2.3', '2.4', '2.5', '2.6'], 3: ['3.1', '3.2', '3.3', '3.4', '3.5'],
+    4: ['4.1', '4.2', '4.3', '4.4', '4.5'], 5: ['5.1', '5.2', '5.3', '5.4'], 6: ['6.1', '6.2', '6.3', '6.4', '6.5', '6.6'],
+    7: ['7.1', '7.2', '7.3', '7.4', '7.5'], 8: ['8.1', '8.2', '8.3', '8.4', '8.5'], 9: ['9.1', '9.2', '9.3', '9.4'],
+    10: ['10.1', '10.2', '10.3', '10.4', '10.5'],
+  };
+
   function defaults() {
     return {
       v: 1,
+      schema: SCHEMA,
       created: Date.now(),
       profile: { name: '' },
       settings: {
@@ -24,10 +38,14 @@
         baselineWpm: 80, // niveau à deux doigts, tracé sur la courbe
         testDuration: 2,
         testFingers: 10,
+        seriesLength: 'normal', // short (≈60 caractères) | normal (≈150) | long (≈300)
+        // Dernier réglage de l'atelier de répétitions
+        workshop: { chars: 'fjdk', type: 'alternate', mode: 'chars', minutes: 2, count: 150, weak: false },
       },
-      lessons: {}, // id -> {done, stars, bestWpm, bestAcc, tries}
-      modules: {}, // id -> {skipped, t}
-      tests: [], // {t, dur, fingers, wpm, raw, acc, ok, bad, series, errs, misses}
+      lessons: {}, // id -> {done, stars, bestWpm, bestAcc, tries, stages:{intro, repeat, ...: {done, bestAcc, bestWpm, tries}}}
+      modules: {}, // id -> {skipped, done, legacy, end:{e1,e2,e3,mastery,revision}, t}
+      tests: [], // {t, dur, fingers, wpm, raw, acc, ok, bad, series, errs, misses}  — tests chronométrés uniquement
+      sessions: [], // exercices de l'atelier : {t, type, chars, dur, len, wpm, acc, errors} — comptent dans la série, pas dans les records
       chars: {}, // caractère -> {n, m}
       days: {}, // 'AAAA-MM-JJ' -> {sec, n}
       badges: {}, // id -> timestamp
@@ -67,13 +85,60 @@
       out.baselineWpm = Math.min(300, Math.max(5, Math.round(num(s.baselineWpm, out.baselineWpm))));
       if ([1, 2, 3, 5].includes(s.testDuration)) out.testDuration = s.testDuration;
       if (s.testFingers === 2 || s.testFingers === 10) out.testFingers = s.testFingers;
+      if (['short', 'normal', 'long'].includes(s.seriesLength)) out.seriesLength = s.seriesLength;
+      if (isObj(s.workshop)) {
+        const w = s.workshop;
+        const chars = typeof w.chars === 'string' ? Array.from(new Set(Array.from(w.chars.normalize('NFC')).filter((c) => c !== ' '))).slice(0, 120).join('') : out.workshop.chars;
+        out.workshop = {
+          chars: chars || out.workshop.chars,
+          type: WORKSHOP_TYPES.includes(w.type) ? w.type : out.workshop.type,
+          mode: w.mode === 'minutes' ? 'minutes' : 'chars',
+          minutes: Math.min(30, Math.max(1, Math.round(num(w.minutes, 2)))),
+          count: Math.min(2000, Math.max(20, Math.round(num(w.count, 150)))),
+          weak: !!w.weak,
+        };
+      }
     }
-    d.lessons = cleanMap(obj.lessons, (v) =>
-      isObj(v)
-        ? { done: !!v.done, stars: Math.min(3, Math.max(0, Math.round(num(v.stars, 0)))), bestWpm: num(v.bestWpm, 0), bestAcc: num(v.bestAcc, 0), tries: Math.round(num(v.tries, 0)) }
-        : undefined
-    );
-    d.modules = cleanMap(obj.modules, (v) => (isObj(v) && v.skipped ? { skipped: true, t: num(v.t, 0) } : undefined));
+    d.lessons = cleanMap(obj.lessons, (v) => {
+      if (!isObj(v)) return undefined;
+      const l = { done: !!v.done, stars: Math.min(3, Math.max(0, Math.round(num(v.stars, 0)))), bestWpm: num(v.bestWpm, 0), bestAcc: num(v.bestAcc, 0), tries: Math.round(num(v.tries, 0)) };
+      if (isObj(v.stages)) {
+        l.stages = cleanMap(v.stages, (s) => (isObj(s) ? { done: !!s.done, bestAcc: num(s.bestAcc, 0), bestWpm: num(s.bestWpm, 0), tries: Math.round(num(s.tries, 0)) } : undefined));
+      }
+      return l;
+    });
+    d.modules = cleanMap(obj.modules, (v) => {
+      if (!isObj(v)) return undefined;
+      const end = cleanMap(v.end, (x) => (x === true ? true : undefined));
+      const m = { t: num(v.t, 0) };
+      if (v.skipped) m.skipped = true;
+      if (v.done) m.done = true;
+      if (v.legacy) m.legacy = true;
+      if (Object.keys(end).length) m.end = end;
+      return m.skipped || m.done || m.legacy || m.end ? m : undefined;
+    });
+    // Migration schéma 1 -> 2 : un module dont toutes les anciennes leçons étaient réussies reste « terminé ».
+    // Les étoiles, les tests, les badges, les statistiques et les jours ne changent pas.
+    if (num(obj.schema, 1) < SCHEMA) {
+      Object.keys(LEGACY_LESSONS).forEach((id) => {
+        if (LEGACY_LESSONS[id].every((l) => d.lessons[l] && d.lessons[l].done)) d.modules[id] = Object.assign({ t: Date.now() }, d.modules[id], { done: true, legacy: true });
+      });
+    }
+    if (Array.isArray(obj.sessions)) {
+      d.sessions = obj.sessions
+        .filter((s) => isObj(s) && num(s.t, 0) > 0 && num(s.acc, -1) >= 0 && num(s.wpm, -1) >= 0)
+        .slice(-500)
+        .map((s) => ({
+          t: s.t,
+          type: WORKSHOP_TYPES.includes(s.type) ? s.type : 'mix',
+          chars: typeof s.chars === 'string' ? s.chars.slice(0, 120) : '',
+          dur: num(s.dur, 0),
+          len: Math.round(num(s.len, 0)),
+          wpm: s.wpm,
+          acc: s.acc,
+          errors: Math.round(num(s.errors, 0)),
+        }));
+    }
     if (Array.isArray(obj.tests)) {
       d.tests = obj.tests
         .filter((t) => isObj(t) && num(t.wpm, -1) >= 0 && num(t.acc, -1) >= 0 && num(t.t, 0) > 0 && num(t.dur, 0) > 0)
@@ -221,13 +286,51 @@
       }
       this.save();
     },
+    // Étapes d'une leçon (intro, répétition, ...) : { done, bestAcc, bestWpm, tries }
+    stage(lessonId, stage) {
+      const l = this.state.lessons[lessonId];
+      return (l && l.stages && l.stages[stage]) || null;
+    },
+    recordStage(lessonId, stage, res) {
+      const l = this.state.lessons[lessonId] || (this.state.lessons[lessonId] = { done: false, stars: 0, bestWpm: 0, bestAcc: 0, tries: 0 });
+      if (!l.stages) l.stages = {};
+      const s = l.stages[stage] || (l.stages[stage] = { done: false, bestAcc: 0, bestWpm: 0, tries: 0 });
+      s.tries++;
+      s.bestAcc = Math.max(s.bestAcc, Math.round(num(res.acc, 0) * 10) / 10);
+      s.bestWpm = Math.max(s.bestWpm, Math.round(num(res.wpm, 0)));
+      if (res.passed) s.done = true;
+      this.save();
+    },
+    // Fin de module : e1, e2, e3 (endurance), mastery (maîtrise), revision (mélange)
+    endDone(modId, step) {
+      const m = this.state.modules[modId];
+      return !!(m && ((m.end && m.end[step]) || m.skipped || m.done));
+    },
+    recordEnd(modId, step) {
+      const m = this.state.modules[modId] || (this.state.modules[modId] = { t: Date.now() });
+      m.end = m.end || {};
+      m.end[step] = true;
+      this.save();
+    },
     moduleDone(mod) {
       const m = this.state.modules[mod.id];
-      if (m && m.skipped) return true;
-      return mod.lessons.every((l) => this.state.lessons[l.id] && this.state.lessons[l.id].done);
+      if (m && (m.skipped || m.done)) return true;
+      const lessonsOk = mod.lessons.every((l) => this.state.lessons[l.id] && this.state.lessons[l.id].done);
+      return lessonsOk && END_STEPS.every((s) => !!(m && m.end && m.end[s]));
     },
+    // Avancement du module : leçons + étapes de fin de module
     moduleProgress(mod) {
-      return mod.lessons.filter((l) => this.state.lessons[l.id] && this.state.lessons[l.id].done).length;
+      const m = this.state.modules[mod.id];
+      const lessons = mod.lessons.filter((l) => this.state.lessons[l.id] && this.state.lessons[l.id].done).length;
+      const end = END_STEPS.filter((s) => m && m.end && m.end[s]).length;
+      return lessons + end;
+    },
+    moduleTotal(mod) {
+      return mod.lessons.length + END_STEPS.length;
+    },
+    // Toutes les leçons faites : la fin de module est ouverte
+    lessonsDone(mod) {
+      return mod.lessons.every((l) => this.state.lessons[l.id] && this.state.lessons[l.id].done);
     },
     moduleUnlocked(modules, idx) {
       if (idx === 0) return true;
@@ -250,6 +353,13 @@
       }
       this.save();
     },
+    // Exercices de l'atelier : enregistrés à part des tests chronométrés (ils ne comptent ni pour les
+    // badges de vitesse, ni pour le certificat), mais le temps passé compte pour l'objectif quotidien.
+    addSession(s) {
+      this.state.sessions.push(s);
+      if (this.state.sessions.length > 500) this.state.sessions.splice(0, this.state.sessions.length - 500);
+      this.save();
+    },
     testsBy(fingers) {
       return this.state.tests.filter((t) => t.fingers === fingers);
     },
@@ -259,6 +369,8 @@
     },
   };
 
+  Store.normalize = normalize; // exposé pour les tests de migration
+  Store.END_STEPS = END_STEPS;
   DD.Store = Store;
   Store.load();
   window.addEventListener('beforeunload', () => Store.save());

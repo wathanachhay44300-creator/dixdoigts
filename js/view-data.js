@@ -29,6 +29,7 @@
       '<div class="card"><h3>Minutes d\'entraînement (14 derniers jours)</h3><div id="s-days"></div></div>' +
       '<div class="card"><h3>Touches ratées</h3><div id="s-heat"></div></div>' +
       '<div class="card"><h3>Historique des tests</h3><div id="s-table"></div></div>' +
+      '<div class="card"><h3>Exercices de l\'atelier</h3><p class="muted small">Ils comptent dans ton objectif du jour et ta série, mais pas dans tes records de vitesse ni dans le certificat.</p><div id="s-ws"></div></div>' +
       '<div class="card"><h3>Sauvegarde</h3><p class="muted">Ta progression est enregistrée dans ce navigateur. Si tu vides les données du navigateur, elle disparaît : exporte-la de temps en temps.</p><div class="actions"><button class="btn ghost" id="s-export">Exporter ma progression</button><a class="btn ghost" href="#/reglages">Importer / réinitialiser</a></div></div>' +
       '</section>';
     const $ = (id) => root.querySelector('#' + id);
@@ -86,6 +87,14 @@
         rows.map((t) => '<tr><td>' + DD.fmt.date(t.t) + '</td><td>' + t.dur / 60 + ' min</td><td>' + t.fingers + '</td><td><b>' + Math.round(t.wpm) + '</b></td><td>' + DD.fmt.pct(t.acc) + '</td><td>' + t.bad + '</td></tr>').join('') +
         '</tbody></table></div>'
       : '<p class="muted">Aucun test pour l\'instant.</p>';
+    // exercices de l'atelier (séparés des tests chronométrés)
+    const TYPE = { repeat: 'Répétition', alternate: 'Alternances', pseudo: 'Pseudo-mots', words: 'Mots réels', mix: 'Mélange' };
+    const ws = (st.sessions || []).slice(-15).reverse();
+    $('s-ws').innerHTML = ws.length
+      ? '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Exercice</th><th>Touches</th><th>Durée</th><th>MPM</th><th>Précision</th></tr></thead><tbody>' +
+        ws.map((s) => '<tr><td>' + DD.fmt.date(s.t) + '</td><td>' + (TYPE[s.type] || s.type) + '</td><td><span class="mono">' + DD.esc(Array.from(s.chars).slice(0, 14).join(' ')) + (s.chars.length > 14 ? ' …' : '') + '</span></td><td>' + DD.fmt.duration(s.dur) + '</td><td><b>' + Math.round(s.wpm) + '</b></td><td>' + DD.fmt.pct(s.acc) + '</td></tr>').join('') +
+        '</tbody></table></div>'
+      : '<p class="muted">Aucun exercice pour l\'instant. <a href="#/atelier">Ouvrir l\'atelier</a></p>';
     $('s-export').onclick = exportProgress;
   };
 
@@ -179,6 +188,7 @@
       '<div class="notice warn" id="layout-warn" hidden></div>' +
       '<div class="card form"><h3>Profil</h3><label>Prénom ou nom<input id="p-name" maxlength="50" value="' + DD.esc(S().state.profile.name) + '"></label>' +
       '<label>Objectif quotidien<select id="p-goal">' + [5, 10, 15, 20, 30].map((m) => '<option value="' + m + '"' + sel(m, st.dailyGoalMin) + '>' + m + ' minutes</option>').join('') + '</select><small>Un jour compte dans ta série quand tu atteins cet objectif.</small></label>' +
+      '<label>Longueur des séries d\'exercice<select id="p-series">' + [['short', 'Courte (≈ 60 caractères)'], ['normal', 'Normale (≈ 150 caractères)'], ['long', 'Longue (≈ 300 caractères)']].map((o) => '<option value="' + o[0] + '"' + sel(o[0], st.seriesLength) + '>' + o[1] + '</option>').join('') + '</select><small>Pour les séries des leçons et la révision de fin de module. Chaque série peut être refaite à l\'infini avec un contenu nouveau.</small></label>' +
       '<label>Mon niveau à deux doigts (MPM)<input id="p-base" type="number" min="5" max="300" value="' + st.baselineWpm + '"><small>Tracé comme une ligne sur ta courbe. Tu peux aussi le mesurer avec un test « 2 doigts ».</small></label></div>' +
       '<div class="card form"><h3>Clavier</h3><label>Disposition<select id="p-layout">' + DD.Layout.all().map((l) => '<option value="' + l.id + '"' + sel(l.id, st.layout) + '>' + l.name + '</option>').join('') + '</select><small>Change quelques touches (par exemple le tiret et le point d\'exclamation). Choisis celle qui ressemble à ton clavier.</small></label>' +
       '<label class="check"><input id="p-kb" type="checkbox"' + (st.showKeyboard ? ' checked' : '') + '> Afficher le clavier visuel et les indications de doigts</label></div>' +
@@ -192,6 +202,7 @@
     const save = () => S().save();
     $('p-name').onchange = () => ((S().state.profile.name = $('p-name').value.trim().slice(0, 50)), save());
     $('p-goal').onchange = () => ((st.dailyGoalMin = +$('p-goal').value), save());
+    $('p-series').onchange = () => ((st.seriesLength = $('p-series').value), save());
     $('p-base').onchange = () => {
       st.baselineWpm = Math.min(300, Math.max(5, Math.round(+$('p-base').value || 80)));
       $('p-base').value = st.baselineWpm;

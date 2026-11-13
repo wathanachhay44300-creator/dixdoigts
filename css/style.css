@@ -145,6 +145,45 @@ a.les:hover { border-color: var(--accent); }
 .stars .off { color: #dcd8cb; }
 .skip { background: #fffaf0; border-color: #f0d9a4; }
 
+/* ---------- Leçon en étapes, fin de module, atelier ---------- */
+.stepper { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 12px 0; }
+.step { display: flex; }
+.step a, .step > span { display: inline-flex; }
+.step > a, .step { text-decoration: none; }
+.step a, .step.locked { align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 99px; background: #ebe8de; color: var(--muted); font-weight: 600; font-size: 14px; text-decoration: none; }
+.step.locked { opacity: 0.55; }
+.step-n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; font-size: 12px; font-weight: 700; color: var(--muted); }
+.step.done a { background: #e3f4ea; color: var(--good); }
+.step.done .step-n { background: var(--good); color: #fff; }
+.step.cur a, .step.cur { background: transparent; }
+.step.cur a { background: var(--ink); color: #fff; }
+.step.cur .step-n { background: #fff; color: var(--ink); }
+.stage-dots { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; }
+.stage-dots i { width: 9px; height: 9px; border-radius: 50%; background: #d9d5c8; }
+.stage-dots i.on { background: var(--good); }
+.len-ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 4px; }
+.len-ctl .opt-label { margin: 0; }
+.intro-line { margin-bottom: 6px; }
+.pause { text-align: center; padding: 40px 20px; }
+.pause .actions { justify-content: center; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+.presets select { font: inherit; font-size: 13.5px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+.kbd.pick .key { cursor: pointer; }
+.kbd.pick .key.special { cursor: default; opacity: 0.6; }
+.kbd.pick .key.sel { background: var(--fc); border-color: color-mix(in srgb, var(--fc) 65%, #000); color: #10131c; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; min-height: 32px; }
+.chip-c { font: 600 14px var(--mono); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+.chip-c:hover { border-color: var(--bad); color: var(--bad); }
+.types { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.type { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; background: #fff; }
+.type small { display: block; color: var(--muted); font-weight: 400; }
+.type.off { opacity: 0.5; cursor: default; }
+.type input { margin-top: 4px; }
+.card label.check { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; font-weight: 500; }
+.card label.check select, .card label.check input[type='number'] { font: inherit; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+.mono { font-family: var(--mono); }
+.sample { background: #fff; border: 1px dashed var(--line); border-radius: 12px; padding: 14px 18px; font: 16px/1.7 var(--mono); white-space: pre-wrap; margin: 12px 0; }
+
 /* ---------- Zone de frappe ---------- */
 .tt-wrap { margin: 16px 0 8px; }
 .tt {

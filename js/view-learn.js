@@ -18,9 +18,10 @@
           const done = S().moduleDone(m);
           const open = S().moduleUnlocked(mods, i);
           const prog = S().moduleProgress(m);
+          const tot = S().moduleTotal(m);
           const skipped = S().state.modules[m.id] && S().state.modules[m.id].skipped;
-          const pct = done ? 100 : (prog / m.lessons.length) * 100;
-          const state = done ? (skipped ? 'Validé par test' : 'Terminé') : open ? prog + ' / ' + m.lessons.length + ' leçons' : 'Verrouillé';
+          const pct = done ? 100 : (prog / tot) * 100;
+          const state = done ? (skipped ? 'Validé par test' : 'Terminé') : open ? prog + ' / ' + tot + ' étapes' : 'Verrouillé';
           return (
             '<a class="mod ' + (done ? 'done' : open ? 'open' : 'locked') + '" href="#/module/' + m.id + '">' +
             '<span class="mod-ico">' + DD.esc(m.icon) + '</span>' +
@@ -73,9 +74,11 @@
       '<p class="streak">🔥 <b>' + sk.current + '</b> jour' + (sk.current > 1 ? 's' : '') + ' de suite <span class="muted">(record : ' + sk.best + ')</span></p></div>' +
       '<div class="card"><h3>Continuer</h3>' +
       (next
-        ? '<p class="next-title"><span class="muted">Module ' + next.module.id + ' · ' + DD.esc(next.module.title) + '</span><br><strong>' + next.lesson.id + ' ' + DD.esc(next.lesson.title) + '</strong></p><a class="btn primary" href="#/lecon/' + next.lesson.id + '">Reprendre la leçon</a>'
-        : '<p>Toutes les leçons sont terminées. Bravo ! Continue avec les tests pour progresser en vitesse.</p><a class="btn primary" href="#/test">Faire un test</a>') +
-      '<div class="quick"><a class="btn ghost small" href="#/points-faibles">Points faibles</a><a class="btn ghost small" href="#/guide">Guide des mains</a></div></div>' +
+        ? next.end
+          ? '<p class="next-title"><span class="muted">Module ' + next.module.id + ' · ' + DD.esc(next.module.title) + '</span><br><strong>Fin de module : ' + DD.esc(C.endLabel(next.module, next.end)) + '</strong></p><a class="btn primary" href="#/fin/' + next.module.id + '/' + next.end + '">Continuer</a>'
+          : '<p class="next-title"><span class="muted">Module ' + next.module.id + ' · ' + DD.esc(next.module.title) + '</span><br><strong>' + next.lesson.id + ' ' + DD.esc(next.lesson.title) + '</strong></p><a class="btn primary" href="#/lecon/' + next.lesson.id + '">Reprendre la leçon</a>'
+        : '<p>Tous les modules sont terminés. Bravo ! Continue avec les tests pour progresser en vitesse.</p><a class="btn primary" href="#/test">Faire un test</a>') +
+      '<div class="quick"><a class="btn ghost small" href="#/atelier">Atelier</a><a class="btn ghost small" href="#/points-faibles">Points faibles</a><a class="btn ghost small" href="#/guide">Guide des mains</a></div></div>' +
       '<div class="card"><h3>Ton niveau à dix doigts</h3><div class="level"><b>' + (best10 ? Math.round(best10) : '—') + '</b><span>MPM</span><em class="muted">à deux doigts : ' + base + ' MPM</em></div>' +
       '<div class="levelbar"><span style="width:' + Math.min(100, (best10 / (base * 1.25)) * 100) + '%"></span><i style="left:' + (base / (base * 1.25)) * 100 + '%"></i></div>' +
       '<p class="muted small">' + levelMsg + '</p><a class="btn ghost small" href="#/test">Faire un test</a></div>' +
@@ -98,10 +101,40 @@
   };
 
   V.lessons = function (root) {
-    root.innerHTML = '<section class="page"><h1>Leçons</h1><p class="lead">Dix modules, du plus simple au plus complet. Un module se débloque quand le précédent est terminé, ou validé par un test de passage.</p>' + moduleCards() + '</section>';
+    root.innerHTML =
+      '<section class="page"><h1>Leçons</h1><p class="lead">Dix modules, du plus simple au plus complet. Un module se débloque quand le précédent est terminé, ou validé par un test de passage.</p>' +
+      '<div class="notice">Envie de répéter une touche ou un doigt précis, sans suivre le parcours ? <a href="#/atelier"><b>Ouvre l\'atelier de répétitions</b></a>.</div>' +
+      moduleCards() + '</section>';
   };
 
   // ---- Module -------------------------------------------------------------------------------
+  // Bouton « suite » vers la prochaine leçon ou la prochaine étape de fin de module
+  function nextButton(nxt) {
+    if (nxt.lesson) return { label: 'Leçon suivante', href: '#/lecon/' + nxt.lesson.id, primary: true };
+    return { label: 'Fin du module : ' + C.endLabel(nxt.module, nxt.end), href: '#/fin/' + nxt.module.id + '/' + nxt.end, primary: true };
+  }
+  V.nextButton = nextButton;
+
+  // ---- Fin de module : 3 séries d'endurance, test de maîtrise, révision en mélange ------------------------------------------------
+  function endCard(m, open) {
+    const lessonsOk = S().lessonsDone(m);
+    const moduleOk = S().moduleDone(m);
+    const rows = C.END_STEPS.map((step, i) => {
+      const done = S().endDone(m.id, step);
+      const prevDone = i === 0 || S().endDone(m.id, C.END_STEPS[i - 1]);
+      const can = open && (lessonsOk || moduleOk) && (prevDone || done);
+      const secs = C.END_SECONDS[step];
+      const meta = step === 'revision' ? 'au moins ' + Math.max(150, C.seriesLen()) + ' caractères' : secs / 60 + ' min' + (step === 'mastery' ? ' · 95 % de précision' : '');
+      const body = '<span class="les-id">' + (i + 1) + '</span><span class="les-body"><strong>' + DD.esc(C.endLabel(m, step)) + '</strong><span class="muted small">' + meta + '</span></span><span class="les-stars">' + (done ? '✓' : '') + '</span>';
+      return can ? '<a class="les' + (done ? ' done' : '') + '" href="#/fin/' + m.id + '/' + step + '">' + body + '</a>' : '<div class="les locked' + (done ? ' done' : '') + '">' + body + '</div>';
+    }).join('');
+    return (
+      '<h2>Fin du module</h2><p class="muted">' +
+      (lessonsOk || moduleOk ? "Trois séries d'endurance (avec une courte pause entre chaque), un test de maîtrise, puis une révision en mélange." : 'Se débloque quand toutes les leçons sont terminées.') +
+      '</p><div class="lesson-list">' + rows + '</div>'
+    );
+  }
+
   V.module = function (root, id) {
     const mods = C.modules;
     const idx = mods.findIndex((m) => m.id === +id);
@@ -116,8 +149,12 @@
         const r = S().lesson(l.id);
         const meta = r && r.tries ? 'meilleur : ' + r.bestWpm + ' MPM · ' + DD.fmt.pct(r.bestAcc) : l.desc || '';
         const goal = l.minWpm ? '<span class="pill">≥ ' + l.minWpm + ' MPM</span>' : '';
+        // Leçons en étapes : une pastille par étape (faite / à faire)
+        const dots = l.staged
+          ? '<span class="stage-dots">' + l.stages().map((st) => '<i class="' + (r && (r.done || (r.stages && r.stages[st] && r.stages[st].done)) ? 'on' : '') + '" title="' + DD.esc(C.STAGE_LABELS[st]) + '"></i>').join('') + '</span>'
+          : '';
         const body =
-          '<span class="les-id">' + l.id + '</span><span class="les-body"><strong>' + DD.esc(l.title) + '</strong> ' + goal + '<span class="muted small">' + DD.esc(meta) + '</span></span>' +
+          '<span class="les-id">' + l.id + '</span><span class="les-body"><strong>' + DD.esc(l.title) + '</strong> ' + goal + dots + '<span class="muted small">' + DD.esc(meta) + '</span></span>' +
           '<span class="les-stars">' + (r && r.done ? stars(r.stars) : '') + '</span>';
         return open ? '<a class="les' + (r && r.done ? ' done' : '') + '" href="#/lecon/' + l.id + '">' + body + '</a>' : '<div class="les locked">' + body + '</div>';
       })
@@ -130,6 +167,7 @@
       (!open ? '<div class="notice">🔒 Termine d\'abord le module ' + prev.id + ' (« ' + DD.esc(prev.title) + ' »), ou valide-le avec un test de passage.</div>' : '') +
       (fingers ? '<div class="card"><h3>Les doigts de ce module</h3><div id="m-hands"></div><div id="m-kb"></div></div>' : '') +
       '<div class="lesson-list">' + rows + '</div>' +
+      endCard(m, open) +
       (m.skip && open && !done
         ? '<div class="card skip"><h3>Tu connais déjà ces touches ?</h3><p>Le test de passage valide le module d\'un coup : il faut <b>95 %</b> de précision et au moins <b>' + m.skip.minWpm + ' MPM</b>. Il vérifie que tu connais les touches, pas la technique des dix doigts : joue le jeu !</p><a class="btn primary" href="#/passage/' + m.id + '">Passer le test de passage</a></div>'
         : '') +
@@ -148,11 +186,12 @@
   };
 
   // ---- Leçon ----------------------------------------------------------------------------------
-  V.lesson = function (root, id) {
+  V.lesson = function (root, id, stage) {
     const f = C.find(id);
     if (!f) return (location.hash = '#/lecons');
     const mods = C.modules;
     if (!S().moduleUnlocked(mods, mods.indexOf(f.module))) return (location.hash = '#/module/' + f.module.id);
+    if (f.lesson.staged) return V.stagedLesson(root, f, stage); // leçon en étapes (view-lesson.js)
     const { module: m, lesson: l } = f;
     const run = DD.StrictRun(root, {
       title: l.id + ' · ' + l.title,
@@ -166,17 +205,15 @@
         const wpmOk = res.wpm >= l.minWpm;
         const passed = accOk && wpmOk;
         const nStars = passed ? 1 + (res.acc >= 95 ? 1 : 0) + (res.acc >= 98 ? 1 : 0) : 0;
-        const wasDone = S().moduleDone(m);
         S().recordLesson(l.id, { wpm: res.wpm, acc: res.acc, passed, stars: nStars });
         const notes = [];
         if (!accOk) notes.push('Précision : il en faut au moins ' + l.minAcc + ' %. Ralentis un peu, la vitesse viendra après.');
         if (accOk && !wpmOk) notes.push('Vitesse : vise ' + l.minWpm + ' MPM (tu es à ' + Math.round(res.wpm) + ').');
         if (passed && res.blind && res.acc >= 95) notes.push('Clavier masqué : bravo, c\'est la vraie technique 🙈');
-        if (passed && !wasDone && S().moduleDone(m)) notes.push('🎉 Module « ' + DD.esc(m.title) + ' » terminé !');
         const nxt = C.after(l.id);
         const buttons = [];
-        const again = { label: 'Recommencer', onclick: () => DD.router.reload(), primary: !passed };
-        if (passed && nxt) buttons.push({ label: 'Leçon suivante', href: '#/lecon/' + nxt.lesson.id, primary: true });
+        const again = { label: 'Recommencer (nouveau contenu)', onclick: () => DD.router.reload(), primary: !passed };
+        if (passed && nxt) buttons.push(nextButton(nxt));
         if (passed && !nxt) buttons.push({ label: 'Faire un test chronométré', href: '#/test', primary: true });
         buttons.push(again);
         buttons.push({ label: 'Retour au module', href: '#/module/' + m.id });

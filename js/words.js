@@ -67,8 +67,34 @@
     sûr mûr coûter dû goûter flûte août coûteux piqûre mûrir
   `;
 
+  // Mots écrits uniquement avec les touches de la rangée du haut (a z e r t y u i o p) :
+  // il en faut au moins 30 pour proposer des « mots réels » dans le module 2.
+  const TOP_ROW_WORDS = `
+    tu te ta ou or et eu au eau air aire art arte pie pire pur pure rue ruer rat rare rire ire tour tout
+    toute tuer trier tirer taire tarte tapir tapez payer pirate pitre poire poirier poterie porte porter
+    partie part pare prie prier priez port pot trio trop troupe troupeau route roue ratio rater outre
+    ouate euro aorte oui type typo tripe retirer reporter apporter rapporter terrier tutoyer pierre
+    zip zut azur azote zoo pizza pizzeria riez tuez payez portez partiez trouez paire taupe poutre
+    outrer tourte pourri pourrie trouer tripoter peur toit tuyau rayure retour tortue terre auto autre
+    autour tuteur porteur rapport apport report trait traite tirait partir partit tarir
+    pourrir pourrai pariez apurer apeure appuie appui zapper zappe
+  `;
+
+  // Mots en plus pour les leçons d'accents (assez de mots pour chaque leçon)
+  const ACCENT_MORE = `
+    maçon pinçon limaçon hameçon forçat façonner reçoit reçue déçu déçue perçu aperçoit commença garçons
+    leçons façons maçons glaçons soupçons agaçant glaçage tronçon rançon façades plaçons avançons perçons
+    traçons effaçons
+    têtu bêtise pêcher forêts fenêtres rêves têtes fêtes bêtes gêner enquête tempête conquête honnête
+    prêter prêts arrêt arrêts
+    gâteaux châteaux bâtiments pâtes pâtisserie âgé mâcher grâce tâche plâtre bâtir âpre câble râteau
+    maîtriser plaît gîte abîmer traîneau chaîne boîte fraîche naître
+    rôti pôle hôte arôme cône tôle côte côtes diplômé drôlement
+    brûler brûlé mûre sûrement flûtes piqûres goûts goûté
+  `;
+
   const uniq = (s) => Array.from(new Set(s.split(/\s+/).filter(Boolean).map((w) => w.normalize('NFC'))));
-  const WORDS = uniq(RAW + ' ' + ACCENT_EXTRA);
+  const WORDS = uniq(RAW + ' ' + ACCENT_EXTRA + ' ' + TOP_ROW_WORDS + ' ' + ACCENT_MORE);
   const PLAIN = WORDS.filter((w) => /^[a-z]+$/.test(w));
 
   const SIMPLE = [

@@ -1,0 +1,9 @@
+{
+  "name": "dixdoigts",
+  "private": true,
+  "description": "Site statique : aucune dépendance. Ce fichier ne sert qu'à lancer les tests (npm test).",
+  "scripts": {
+    "test": "node --test tests/*.test.js && node tests/validate-corpus.js",
+    "corpus": "node tests/validate-corpus.js"
+  }
+}
