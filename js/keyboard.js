@@ -1,4 +1,4 @@
-/* Clavier visuel (coloré par doigt ou en carte de chaleur) et schéma des mains. */
+/* Clavier visuel (coloré par doigt ou en carte de chaleur). Les mains animées viennent de hands.js. */
 (function () {
   const DD = window.DD;
   const F = DD.Layout.FINGERS;
@@ -13,9 +13,11 @@
   const Keyboard = {
     /**
      * Crée un clavier. mode = 'fingers' (couleur par doigt) ou 'heat' (carte de chaleur).
-     * Renvoie { el, setNext(ids), flash(id, kind), setHeat(map) }.
+     * opts.hands = true : superpose les mains animées (si elles sont activées dans les réglages).
+     * Renvoie { el, byId, setNext(ids), flash(id, kind), pressKey(id), markError(), setFocus(ids), setHeat(map), hands }.
      */
-    create(layout, mode) {
+    create(layout, mode, opts) {
+      opts = opts || {};
       layout = layout || DD.Layout.current();
       const root = DD.el('div', 'kbd ' + (mode === 'heat' ? 'heat' : 'fingers'));
       const byId = {};
@@ -36,17 +38,39 @@
         });
         root.appendChild(rowEl);
       });
-      return {
+      let lit = []; // touches actuellement surlignées (on ne nettoie que celles-là : plus rapide à chaque frappe)
+      const api = {
         el: root,
         byId,
-        setNext(ids) {
-          Object.values(byId).forEach((k) => k.classList.remove('next', 'mod'));
+        hands: null,
+        // Touches à taper ensuite : surlignées, et les mains vont vers elles (sauf meta.quiet).
+        setNext(ids, meta) {
+          lit.forEach((k) => k.classList.remove('next', 'mod'));
+          lit = [];
           (ids || []).forEach((id, i, arr) => {
             const k = byId[id];
             if (!k) return;
             k.classList.add('next');
-            if (arr.length > 1 && i < arr.length - 1) k.classList.add('mod'); // Maj ou touche morte
+            if (arr.length > 1 && i < arr.length - 1) k.classList.add('mod'); // Maj, AltGr ou touche morte
+            lit.push(k);
           });
+          if (api.hands && !(meta && meta.quiet)) api.hands.target(ids);
+        },
+        // Les mains : visibles ou non (créées au premier besoin)
+        setHandsVisible(on) {
+          if (on && !api.hands && DD.Hands) api.hands = DD.Hands.attach(api, layout);
+          if (api.hands) api.hands.setOptions({ visible: !!on });
+        },
+        // La touche s'enfonce légèrement
+        pressKey(id) {
+          const k = byId[id];
+          if (!k) return;
+          k.classList.add('down');
+          setTimeout(() => k.classList.remove('down'), 150);
+        },
+        // Erreur : secousse du doigt attendu et éclat rouge discret sur la touche attendue
+        markError() {
+          if (api.hands) api.hands.error();
         },
         // Mise en avant d'un ensemble de touches (aperçu d'un module)
         setFocus(ids) {
@@ -58,9 +82,10 @@
           const k = byId[id];
           if (!k) return;
           k.classList.remove('flash-ok', 'flash-bad');
-          void k.offsetWidth;
+          if (kind === 'bad') void k.offsetWidth; // relance la secousse (animation) ; inutile pour le simple changement de couleur
           k.classList.add(kind === 'bad' ? 'flash-bad' : 'flash-ok');
           setTimeout(() => k.classList.remove('flash-ok', 'flash-bad'), 260);
+          if (api.hands) api.hands.feedback(id, kind === 'bad' ? 'bad' : 'ok');
         },
         setHeat(map, info) {
           Object.entries(byId).forEach(([id, k]) => {
@@ -77,6 +102,8 @@
           });
         },
       };
+      if (opts.hands && DD.Hands && DD.Hands.settings().visible) api.hands = DD.Hands.attach(api, layout);
+      return api;
     },
 
     // Agrège des stats {caractère: {n, m}} par touche physique -> valeurs 0..1 pour la carte de chaleur.
@@ -114,69 +141,6 @@
         .sort((a, b) => b.rate - a.rate)
         .slice(0, limit || 5);
     },
-  };
-
-  // ---- Mains -------------------------------------------------------------------
-  // Dessin simple : paume + 4 doigts + pouce par main. 'active' = ensemble de doigts à mettre en avant.
-  const HANDS = {
-    // x, largeur, haut (y du bout), hauteur, étiquette de repos
-    L: [
-      { f: 'LP', x: 34, w: 40, y: 112, h: 98, t: 'Q' },
-      { f: 'LR', x: 82, w: 42, y: 78, h: 132, t: 'S' },
-      { f: 'LM', x: 132, w: 44, y: 66, h: 144, t: 'D' },
-      { f: 'LI', x: 184, w: 44, y: 80, h: 130, t: 'F' },
-    ],
-  };
-
-  Keyboard.hands = function (opts) {
-    opts = opts || {};
-    const active = opts.active || null; // Set de doigts, ou null = tous
-    const W = 640;
-    const parts = [];
-    const dim = (f) => (active && !active.has(f) ? ' dim' : '');
-    const finger = (f, x, w, y, h, label, mirror, home) => {
-      const X = mirror ? W - x - w : x;
-      const cx = X + w / 2;
-      let s = '<g class="fg' + dim(f) + '" style="--fc:' + F[f].color + '">';
-      s += '<rect x="' + X + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + w / 2 + '"/>';
-      s += '<text x="' + cx + '" y="' + (y + 30) + '" text-anchor="middle" class="fl">' + label + '</text>';
-      if (home) s += '<rect class="bump" x="' + (cx - 8) + '" y="' + (y + 38) + '" width="16" height="3" rx="1.5"/>';
-      s += '</g>';
-      return s;
-    };
-    [false, true].forEach((mirror) => {
-      const labels = mirror ? ['J', 'K', 'L', 'M'] : ['Q', 'S', 'D', 'F'];
-      const fingers = mirror
-        ? [
-            { f: 'RI', i: 3 },
-            { f: 'RM', i: 2 },
-            { f: 'RR', i: 1 },
-            { f: 'RP', i: 0 },
-          ]
-        : [
-            { f: 'LP', i: 0 },
-            { f: 'LR', i: 1 },
-            { f: 'LM', i: 2 },
-            { f: 'LI', i: 3 },
-          ];
-      // paume
-      const px = mirror ? W - 34 - 194 : 34;
-      parts.push('<rect class="palm" x="' + px + '" y="190" width="194" height="58" rx="26"/>');
-      fingers.forEach(({ f, i }) => {
-        const g = HANDS.L[i];
-        const label = mirror ? labels[3 - i] : labels[i];
-        parts.push(finger(f, g.x, g.w, g.y, g.h, label, mirror, label === 'F' || label === 'J'));
-      });
-      // pouce
-      const tx = mirror ? W - 236 : 236;
-      parts.push(
-        '<g class="fg' + dim('TH') + '" style="--fc:' + F.TH.color + '"><rect x="' + (tx - 20) + '" y="168" width="40" height="86" rx="20" transform="rotate(' + (mirror ? 38 : -38) + ' ' + tx + ' 214)"/></g>'
-      );
-    });
-    parts.push('<text x="' + (34 + 97) + '" y="272" text-anchor="middle" class="hl">main gauche</text>');
-    parts.push('<text x="' + (W - 34 - 97) + '" y="272" text-anchor="middle" class="hl">main droite</text>');
-    parts.push('<text x="' + W / 2 + '" y="236" text-anchor="middle" class="hl">pouces : espace</text>');
-    return '<svg class="hands" viewBox="0 0 ' + W + ' 282" role="img" aria-label="Position des mains sur la rangée de base">' + parts.join('') + '</svg>';
   };
 
   DD.Keyboard = Keyboard;

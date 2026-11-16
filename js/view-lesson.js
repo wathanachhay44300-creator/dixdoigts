@@ -83,20 +83,26 @@
       const fingers = C.fingersFor(l.newKeys);
       root.innerHTML =
         '<section class="page"><a class="back" href="' + back.href + '">← ' + DD.esc(back.label) + '</a><h1>' + DD.esc(title) + '</h1>' + stepper +
-        '<div class="card"><p class="lead intro-line">' + DD.esc(l.intro) + '</p><div id="i-hands"></div><div id="i-kb"></div>' +
+        '<div class="card"><p class="lead intro-line">' + DD.esc(l.intro) + '</p><div id="i-kb"></div><div class="kbd-bar" id="i-bar"></div>' +
         '<p class="muted small">Dans cette leçon : uniquement ' + Array.from(l.allowed).map((c) => '<kbd>' + DD.esc(c) + '</kbd>').join(' ') + ' (les touches nouvelles sont en couleur). Aucune phrase.</p>' +
         '<div class="actions"><a class="btn primary" id="go" href="' + base + stages[1] + '">Commencer</a></div></div></section>';
-      root.querySelector('#i-hands').innerHTML = DD.Keyboard.hands({ active: fingers });
-      const kb = DD.Keyboard.create(layout, 'fingers');
+      const kb = DD.Keyboard.create(layout, 'fingers', { hands: true });
       kb.setFocus(
         Array.from(l.newKeys)
           .map((c) => layout.hint(c))
           .filter(Boolean)
-          .map((h) => h.main)
+          .flatMap((h) => (h.dead ? h.steps.flat() : [h.main]))
       );
       root.querySelector('#i-kb').appendChild(kb.el);
+      // Les doigts de cette leçon sont mis en avant, et la démo montre ce qu'ils font sur les nouvelles touches.
+      if (kb.hands) kb.hands.highlight(fingers);
+      const demo = DD.Hands.demoBar(kb, { text: () => Array.from(l.newKeys).join(' ') + ' ' + Array.from(l.newKeys).reverse().join(' ') });
+      root.querySelector('#i-bar').appendChild(demo.el);
       root.querySelector('#go').onclick = () => S().recordStage(l.id, 'intro', { acc: 100, wpm: 0, passed: true });
-      return;
+      return () => {
+        demo.stop();
+        if (kb.hands) kb.hands.destroy();
+      };
     }
 
     // --- Séries d'entraînement et mini-test
@@ -149,16 +155,19 @@
     const m = mods[idx];
     const steps = C.END_STEPS;
     if (!m || !m.end || !steps.includes(step)) return (location.hash = '#/lecons');
-    if (!S().moduleUnlocked(mods, idx) || !(S().lessonsDone(m) || S().moduleDone(m))) return (location.hash = '#/module/' + modId);
+    // Module ouvert (progression, déverrouillé, ou « tout déverrouiller »). Un module déverrouillé ouvre aussi sa
+    // fin sans ordre imposé ; sinon : leçons terminées d'abord, et les étapes dans l'ordre conseillé.
+    const free = S().freeAccess(m);
+    if (!S().moduleOpen(mods, idx) || !(S().lessonsDone(m) || S().moduleDone(m) || free)) return (location.hash = '#/module/' + modId);
     const i = steps.indexOf(step);
     const firstTodo = steps.find((s) => !S().endDone(m.id, s)) || steps[0];
-    if (i > 0 && !S().endDone(m.id, steps[i - 1]) && !S().endDone(m.id, step)) return (location.hash = '#/fin/' + m.id + '/' + firstTodo);
+    if (!free && i > 0 && !S().endDone(m.id, steps[i - 1]) && !S().endDone(m.id, step)) return (location.hash = '#/fin/' + m.id + '/' + firstTodo);
 
     const link = (s) => '#/fin/' + m.id + '/' + s;
     const stepper = stepperHTML(
       steps.map((s, k) => ({
         label: s === 'mastery' ? 'Maîtrise' : s === 'revision' ? 'Révision' : 'Endurance ' + (k + 1),
-        state: s === step ? 'cur' : S().endDone(m.id, s) ? 'done' : k === 0 || S().endDone(m.id, steps[k - 1]) ? 'todo' : 'locked',
+        state: s === step ? 'cur' : S().endDone(m.id, s) ? 'done' : free || k === 0 || S().endDone(m.id, steps[k - 1]) ? 'todo' : 'locked',
         href: link(s),
       }))
     );

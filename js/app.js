@@ -20,6 +20,7 @@
     [/^\/certificat$/, 'certificate', '#/certificat'],
     [/^\/guide$/, 'guide', '#/guide'],
     [/^\/reglages$/, 'settings', '#/reglages'],
+    [/^\/diagnostic$/, 'diagnostic', '#/reglages'],
   ];
 
   let cleanup = null;
@@ -102,5 +103,6 @@
     document.querySelectorAll('[data-app-name]').forEach((e) => (e.textContent = DD.APP_NAME));
     run();
     layoutCheck();
+    if (DD.Hands) DD.Hands.loadImageConfig(); // option : remplace les mains SVG par tes images PNG (assets/hands/)
   });
 })();

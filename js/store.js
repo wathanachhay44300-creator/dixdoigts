@@ -11,7 +11,8 @@
 
   // v      : version du format de fichier (reste 1, pour que les anciennes sauvegardes s'importent toujours).
   // schema : version de la structure des leçons. 1 = leçons à plat ; 2 = leçons en étapes + fin de module.
-  const SCHEMA = 2;
+  // 3 = + déverrouillage libre : « ouvert » (peut être joué) est séparé de « validé » (étoiles, scores, modules terminés).
+  const SCHEMA = 3;
   const END_STEPS = ['e1', 'e2', 'e3', 'mastery', 'revision'];
   const WORKSHOP_TYPES = ['repeat', 'alternate', 'pseudo', 'words', 'mix'];
   // Leçons de l'ancienne structure (schéma 1) : sert à garder les modules déjà terminés.
@@ -38,12 +39,21 @@
         baselineWpm: 80, // niveau à deux doigts, tracé sur la courbe
         testDuration: 2,
         testFingers: 10,
+        // Mains réalistes superposées au clavier visuel
+        showHands: true,
+        handOpacity: 50, // 20 à 80 %
+        handTint: 'moyenne', // claire | moyenne | foncee | fantome
+        handSpeed: 'normal', // lent | normal | rapide
+        demoSpeed: 'normal', // vitesse du mode démo : lent | normal
+        unlockAll: false, // « Tout déverrouiller » : tous les modules et toutes les leçons sont ouverts (rien n'est validé pour autant)
         seriesLength: 'normal', // short (≈60 caractères) | normal (≈150) | long (≈300)
         // Dernier réglage de l'atelier de répétitions
         workshop: { chars: 'fjdk', type: 'alternate', mode: 'chars', minutes: 2, count: 150, weak: false },
       },
       lessons: {}, // id -> {done, stars, bestWpm, bestAcc, tries, stages:{intro, repeat, ...: {done, bestAcc, bestWpm, tries}}}
-      modules: {}, // id -> {skipped, done, legacy, end:{e1,e2,e3,mastery,revision}, t}
+      modules: {}, // id -> {skipped, done, legacy, end:{e1,e2,e3,mastery,revision}, t}   (= états VALIDÉS)
+      // Déverrouillés à la main : ça ouvre l'accès, mais ne valide rien (ni étoiles, ni badge, ni progression).
+      unlocks: { modules: [], lessons: [] }, // ids de modules (nombres) et de leçons ('3.2')
       tests: [], // {t, dur, fingers, wpm, raw, acc, ok, bad, series, errs, misses}  — tests chronométrés uniquement
       sessions: [], // exercices de l'atelier : {t, type, chars, dur, len, wpm, acc, errors} — comptent dans la série, pas dans les records
       chars: {}, // caractère -> {n, m}
@@ -86,6 +96,12 @@
       if ([1, 2, 3, 5].includes(s.testDuration)) out.testDuration = s.testDuration;
       if (s.testFingers === 2 || s.testFingers === 10) out.testFingers = s.testFingers;
       if (['short', 'normal', 'long'].includes(s.seriesLength)) out.seriesLength = s.seriesLength;
+      if (typeof s.unlockAll === 'boolean') out.unlockAll = s.unlockAll;
+      if (typeof s.showHands === 'boolean') out.showHands = s.showHands;
+      out.handOpacity = Math.min(80, Math.max(20, Math.round(num(s.handOpacity, out.handOpacity))));
+      if (['claire', 'moyenne', 'foncee', 'fantome'].includes(s.handTint)) out.handTint = s.handTint;
+      if (['lent', 'normal', 'rapide'].includes(s.handSpeed)) out.handSpeed = s.handSpeed;
+      if (['lent', 'normal'].includes(s.demoSpeed)) out.demoSpeed = s.demoSpeed;
       if (isObj(s.workshop)) {
         const w = s.workshop;
         const chars = typeof w.chars === 'string' ? Array.from(new Set(Array.from(w.chars.normalize('NFC')).filter((c) => c !== ' '))).slice(0, 120).join('') : out.workshop.chars;
@@ -119,10 +135,21 @@
     });
     // Migration schéma 1 -> 2 : un module dont toutes les anciennes leçons étaient réussies reste « terminé ».
     // Les étoiles, les tests, les badges, les statistiques et les jours ne changent pas.
-    if (num(obj.schema, 1) < SCHEMA) {
+    // (Seulement pour le schéma 1 : sur des données du schéma 2 ou 3, les identifiants de leçons veulent
+    // déjà dire la même chose que maintenant, il ne faut surtout pas refaire cette conversion.)
+    if (num(obj.schema, 1) < 2) {
       Object.keys(LEGACY_LESSONS).forEach((id) => {
         if (LEGACY_LESSONS[id].every((l) => d.lessons[l] && d.lessons[l].done)) d.modules[id] = Object.assign({ t: Date.now() }, d.modules[id], { done: true, legacy: true });
       });
+    }
+    // Schéma 3 : déverrouillages manuels. Absents des anciennes données = aucun, et les modules / leçons
+    // ouverts par la progression le restent (la règle de progression n'a pas changé).
+    if (isObj(obj.unlocks)) {
+      const pick = (arr, re, max) => (Array.isArray(arr) ? Array.from(new Set(arr.map(String).filter((x) => re.test(x)))).slice(0, max) : []);
+      d.unlocks = {
+        modules: pick(obj.unlocks.modules, /^\d{1,2}$/, 30).map(Number),
+        lessons: pick(obj.unlocks.lessons, /^\d{1,2}\.\d{1,2}$/, 300),
+      };
     }
     if (Array.isArray(obj.sessions)) {
       d.sessions = obj.sessions
@@ -332,9 +359,50 @@
     lessonsDone(mod) {
       return mod.lessons.every((l) => this.state.lessons[l.id] && this.state.lessons[l.id].done);
     },
-    moduleUnlocked(modules, idx) {
+    // ---- ACCÈS : « ouvert » (on peut jouer) ≠ « validé » (moduleDone, étoiles, meilleurs scores) --------------
+    // Déverrouiller n'écrit JAMAIS dans lessons / modules : seulement dans unlocks et settings.unlockAll.
+    // Atteint par la progression : le module 1, ou un module dont le précédent est validé (ou qui l'est lui-même).
+    moduleReached(modules, idx) {
       if (idx === 0) return true;
       return this.moduleDone(modules[idx - 1]) || this.moduleDone(modules[idx]);
+    },
+    isUnlockAll() {
+      return !!this.state.settings.unlockAll;
+    },
+    isModuleManual(id) {
+      return this.state.unlocks.modules.includes(Number(id));
+    },
+    isLessonManual(id) {
+      return this.state.unlocks.lessons.includes(String(id));
+    },
+    // Ouvert = atteint par la progression, déverrouillé à la main, ou « tout déverrouiller »
+    moduleOpen(modules, idx) {
+      return this.isUnlockAll() || this.isModuleManual(modules[idx].id) || this.moduleReached(modules, idx);
+    },
+    // Une leçon est ouverte si son module l'est, si on l'a déverrouillée seule, ou si elle est déjà validée (rejouable)
+    lessonOpen(modules, mod, lesson) {
+      const l = this.state.lessons[lesson.id];
+      return !!(l && l.done) || this.isLessonManual(lesson.id) || this.moduleOpen(modules, modules.indexOf(mod));
+    },
+    // Accès libre (déverrouillé à la main ou « tout déverrouiller ») : la fin de module s'ouvre sans ordre imposé
+    freeAccess(mod) {
+      return this.isUnlockAll() || this.isModuleManual(mod.id);
+    },
+    unlockModule(id) {
+      if (!this.isModuleManual(id)) this.state.unlocks.modules.push(Number(id));
+      this.save();
+    },
+    unlockLesson(id) {
+      if (!this.isLessonManual(id)) this.state.unlocks.lessons.push(String(id));
+      this.save();
+    },
+    setUnlockAll(on) {
+      this.state.settings.unlockAll = !!on;
+      this.save();
+    },
+    // ancien nom, gardé pour ne rien casser
+    moduleUnlocked(modules, idx) {
+      return this.moduleOpen(modules, idx);
     },
     skipModule(id) {
       this.state.modules[id] = { skipped: true, t: Date.now() };

@@ -18,7 +18,7 @@
   const BOT_LETTERS = 'wxcvbn';
   const BOT = BOT_LETTERS + ',;:'; // la rangée du bas : lettres + virgule, point-virgule, deux-points
   const ALPHA = HOME + TOP + BOT_LETTERS;
-  const ACCENTS = 'éèàçùêâîôû';
+  const ACCENTS = 'éèàçùêâîôûëï';
   const DIGITS = '1234567890';
   const PUNCT = ".,;:!?'\"()-/";
   const FULL = ALPHA + ALPHA.toUpperCase() + ACCENTS + DIGITS + PUNCT;
@@ -228,14 +228,14 @@
       title: 'Accents',
       short: 'Accents',
       icon: 'é',
-      desc: 'é è à ç ù sont sur des touches directes. Pour ê â î ô û : touche ^ puis la lettre (touche morte). On répète chaque accent avant de le mélanger aux mots.',
+      desc: "é è à ç ù sont sur des touches directes. Â ê î ô û utilisent une touche morte : appuie sur ^ (à droite de P), rien ne s'affiche : c'est normal, puis appuie sur la voyelle. Ë ï : Maj + ^ (cela donne ¨), puis la voyelle. On répète chaque accent avant de le mélanger aux mots.",
       keys: ACCENTS,
       lessons: [
         accentLesson('6.1', 'É', "É : l'accent aigu, avec l'annulaire gauche, sur la rangée des chiffres (la touche du 2).", 'é', 0),
         accentLesson('6.2', 'È et À', "È et À : l'accent grave, sur la rangée des chiffres (È sur le 7, À sur le 0).", 'èà', 1),
         accentLesson('6.3', 'Ç et Ù', 'Ç sur la touche du 9, Ù à droite de M.', 'çù', 2),
-        accentLesson('6.4', 'Ê et Â', "Ê et Â : tape d'abord la touche ^ (auriculaire droit), puis la lettre.", 'êâ', 3),
-        accentLesson('6.5', 'Î, Ô et Û', 'Î, Ô et Û : même principe, la touche ^ puis la lettre.', 'îôû', 4),
+        accentLesson('6.4', 'Ê et Â', "Ê et Â : appuie sur ^ (auriculaire droit), rien ne s'affiche : c'est normal, puis appuie sur la voyelle.", 'êâ', 3),
+        accentLesson('6.5', 'Î, Ô, Û, Ë et Ï', "Î, Ô, Û : appuie sur ^, rien ne s'affiche : c'est normal, puis sur la voyelle. Ë et Ï : Maj gauche + ^ (cela donne le tréma ¨), rien ne s'affiche non plus, puis la voyelle.", 'îôûëï', 4),
       ],
       skip: { gen: () => revisionText(modules[5]), minWpm: 25 },
       end: {
@@ -404,13 +404,14 @@
     return null;
   }
 
-  // Prochaine chose à faire : une leçon, ou une étape de fin de module.
+  // Prochaine chose à faire (le « Recommandé » et le bouton « Continuer ») : la PREMIÈRE leçon non validée du
+  // parcours, ou l'étape de fin de module. Elle ne dépend jamais de ce qui est déverrouillé : seules les
+  // validations comptent. (Le premier module non validé est toujours atteint, puisque les précédents sont validés.)
   function next() {
     const S = DD.Store;
     for (let i = 0; i < modules.length; i++) {
       const m = modules[i];
       if (S.moduleDone(m)) continue;
-      if (!S.moduleUnlocked(modules, i)) break;
       const l = m.lessons.find((x) => !(S.lesson(x.id) && S.lesson(x.id).done));
       if (l) return { module: m, lesson: l };
       const step = END_STEPS.find((s) => !S.endDone(m.id, s));
@@ -431,6 +432,18 @@
     return nm ? { module: nm, lesson: nm.lessons[0] } : null;
   }
 
+  // « Cet exercice est conseillé après X » : ce qui précède un module ou une leçon dans le parcours.
+  function adviceAfter(target) {
+    const m = target.module;
+    if (target.lesson) {
+      const i = m.lessons.indexOf(target.lesson);
+      if (i > 0) return 'la leçon ' + m.lessons[i - 1].id + ' (« ' + m.lessons[i - 1].title + ' »)';
+    }
+    const j = modules.indexOf(m);
+    if (j > 0) return 'le module ' + modules[j - 1].id + ' (« ' + modules[j - 1].title + ' »)';
+    return null;
+  }
+
   // Doigts utilisés par un ensemble de caractères
   function fingersFor(chars) {
     const layout = DD.Layout.current();
@@ -439,13 +452,14 @@
       const h = layout.hint(c);
       if (!h) return;
       set.add(h.finger);
-      if (h.shift) set.add(h.keys[0] === 'ShiftL' ? 'LP' : 'RP');
+      // tous les doigts qui interviennent : Maj, touche morte, AltGr, voyelle...
+      h.keys.forEach((id) => layout.keys[id] && set.add(layout.keys[id].f));
     });
     return set;
   }
 
   DD.Curriculum = {
-    modules, find, next, after, fingersFor,
+    modules, find, next, after, adviceAfter, fingersFor,
     stageContent, stageOptions, endContent, endOptions, endLabel, seriesLen,
     STAGE_LABELS, END_STEPS, END_SECONDS, SERIES_LEN, CHARS_PER_SEC,
     HOME, TOP, BOT, ALPHA, ACCENTS, DIGITS, PUNCT, FULL,

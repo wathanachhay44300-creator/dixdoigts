@@ -190,7 +190,16 @@
       '<label>Objectif quotidien<select id="p-goal">' + [5, 10, 15, 20, 30].map((m) => '<option value="' + m + '"' + sel(m, st.dailyGoalMin) + '>' + m + ' minutes</option>').join('') + '</select><small>Un jour compte dans ta série quand tu atteins cet objectif.</small></label>' +
       '<label>Longueur des séries d\'exercice<select id="p-series">' + [['short', 'Courte (≈ 60 caractères)'], ['normal', 'Normale (≈ 150 caractères)'], ['long', 'Longue (≈ 300 caractères)']].map((o) => '<option value="' + o[0] + '"' + sel(o[0], st.seriesLength) + '>' + o[1] + '</option>').join('') + '</select><small>Pour les séries des leçons et la révision de fin de module. Chaque série peut être refaite à l\'infini avec un contenu nouveau.</small></label>' +
       '<label>Mon niveau à deux doigts (MPM)<input id="p-base" type="number" min="5" max="300" value="' + st.baselineWpm + '"><small>Tracé comme une ligne sur ta courbe. Tu peux aussi le mesurer avec un test « 2 doigts ».</small></label></div>' +
+      '<div class="card form"><h3>Parcours</h3><label class="check"><input id="p-unlock" type="checkbox"' + (st.unlockAll ? ' checked' : '') + '> Tout déverrouiller</label>' +
+      '<p class="muted small">Ouvre tous les modules et toutes les leçons d\'un coup. L\'ordre du parcours reste conseillé (« Recommandé »), jamais obligatoire. Déverrouiller ne valide rien : pas d\'étoiles, pas de badge, pas de progression tant que tu n\'as pas réussi l\'exercice. Tu peux le désactiver quand tu veux, tes validations sont gardées.</p></div>' +
+      '<div class="card form"><h3>Mains sur le clavier</h3><p class="muted small">Deux mains semi-transparentes se posent sur le clavier visuel et montrent quel doigt appuie sur quelle touche. Elles disparaissent avec le clavier et ne gênent jamais la saisie.</p>' +
+      '<label class="check"><input id="p-hands" type="checkbox"' + (st.showHands ? ' checked' : '') + '> Afficher les mains</label>' +
+      '<label>Opacité : <b id="p-hop-v">' + st.handOpacity + ' %</b><input id="p-hop" type="range" min="20" max="80" step="5" value="' + st.handOpacity + '"><small>Plus c\'est bas, plus les lettres des touches se lisent sous les mains.</small></label>' +
+      '<label>Teinte<select id="p-htint">' + Object.keys(DD.Hands.TINTS).map((k) => '<option value="' + k + '"' + sel(k, st.handTint) + '>' + DD.Hands.TINT_NAMES[k] + '</option>').join('') + '</select></label>' +
+      '<label>Vitesse des mouvements<select id="p-hspeed"><option value="lent"' + sel('lent', st.handSpeed) + '>Lente</option><option value="normal"' + sel('normal', st.handSpeed) + '>Normale</option><option value="rapide"' + sel('rapide', st.handSpeed) + '>Rapide</option></select><small>Si ton système demande de réduire les animations, les mains restent fixes et le doigt à utiliser est seulement surligné.</small></label>' +
+      '<div class="hand-preview" id="p-hprev"></div></div>' +
       '<div class="card form"><h3>Clavier</h3><label>Disposition<select id="p-layout">' + DD.Layout.all().map((l) => '<option value="' + l.id + '"' + sel(l.id, st.layout) + '>' + l.name + '</option>').join('') + '</select><small>Change quelques touches (par exemple le tiret et le point d\'exclamation). Choisis celle qui ressemble à ton clavier.</small></label>' +
+      '<p class="muted small">â, ê, ë... ne s\'écrivent pas ? <a href="#/diagnostic">Ouvre la page de diagnostic du clavier</a> : elle montre ce que ton navigateur envoie quand tu appuies sur ^.</p>' +
       '<label class="check"><input id="p-kb" type="checkbox"' + (st.showKeyboard ? ' checked' : '') + '> Afficher le clavier visuel et les indications de doigts</label></div>' +
       '<div class="card form"><h3>Sons de frappe</h3><label class="check"><input id="p-sound" type="checkbox"' + (st.sound ? ' checked' : '') + '> Activer les sons</label>' +
       '<label>Style<select id="p-prof"><option value="clic"' + sel('clic', st.soundProfile) + '>Clic mécanique</option><option value="doux"' + sel('doux', st.soundProfile) + '>Doux</option><option value="machine"' + sel('machine', st.soundProfile) + '>Machine à écrire</option></select></label>' +
@@ -203,6 +212,46 @@
     $('p-name').onchange = () => ((S().state.profile.name = $('p-name').value.trim().slice(0, 50)), save());
     $('p-goal').onchange = () => ((st.dailyGoalMin = +$('p-goal').value), save());
     $('p-series').onchange = () => ((st.seriesLength = $('p-series').value), save());
+    // Mains : aperçu en direct sur un petit clavier
+    const hprev = DD.Keyboard.create(DD.Layout.current(), 'fingers', { hands: true });
+    $('p-hprev').appendChild(hprev.el);
+    const hset = () => {
+      if (hprev.hands) hprev.hands.setOptions({ visible: st.showHands, opacity: st.handOpacity / 100, tint: st.handTint, speed: st.handSpeed });
+    };
+    const hdemo = () => {
+      if (!hprev.hands || !st.showHands) return;
+      hprev.hands.rest();
+      hprev.setNext(['e']);
+      setTimeout(() => hprev.hands && hprev.hands.show(['e'], 1100), 80);
+    };
+    $('p-hands').onchange = () => {
+      st.showHands = $('p-hands').checked;
+      save();
+      hprev.setHandsVisible(st.showHands);
+      hset();
+      hdemo();
+    };
+    $('p-hop').oninput = () => {
+      st.handOpacity = +$('p-hop').value;
+      $('p-hop-v').textContent = st.handOpacity + ' %';
+      hset();
+    };
+    $('p-hop').onchange = save;
+    $('p-htint').onchange = () => {
+      st.handTint = $('p-htint').value;
+      save();
+      hset();
+    };
+    $('p-hspeed').onchange = () => {
+      st.handSpeed = $('p-hspeed').value;
+      save();
+      hset();
+      hdemo();
+    };
+    $('p-unlock').onchange = () => {
+      S().setUnlockAll($('p-unlock').checked);
+      DD.toast($('p-unlock').checked ? 'Tout est déverrouillé. Rien n\'est validé pour autant.' : 'Retour au parcours conseillé. Tes validations sont conservées.');
+    };
     $('p-base').onchange = () => {
       st.baselineWpm = Math.min(300, Math.max(5, Math.round(+$('p-base').value || 80)));
       $('p-base').value = st.baselineWpm;
@@ -260,5 +309,8 @@
         })
         .catch(() => {});
     }
+    return () => {
+      if (hprev.hands) hprev.hands.destroy();
+    };
   };
 })();

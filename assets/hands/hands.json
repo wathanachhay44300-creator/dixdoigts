@@ -1,0 +1,25 @@
+{
+  "_lisez-moi": "Mettre \"enabled\" à true pour remplacer les mains dessinées (SVG) par tes images PNG transparentes. Voir README.md dans ce dossier. Tant que ce fichier est désactivé, ou que les images manquent, le site utilise les mains SVG.",
+  "enabled": false,
+  "mode": "per-segment",
+  "hands": {
+    "left": "hand-left.png",
+    "right": "hand-right.png",
+    "width": 6.2,
+    "aspect": 0.95,
+    "anchor": [0.5, 0.42],
+    "scale": 1
+  },
+  "segments": {
+    "LP": ["lp-1.png", "lp-2.png", "lp-3.png"],
+    "LR": ["lr-1.png", "lr-2.png", "lr-3.png"],
+    "LM": ["lm-1.png", "lm-2.png", "lm-3.png"],
+    "LI": ["li-1.png", "li-2.png", "li-3.png"],
+    "RI": ["ri-1.png", "ri-2.png", "ri-3.png"],
+    "RM": ["rm-1.png", "rm-2.png", "rm-3.png"],
+    "RR": ["rr-1.png", "rr-2.png", "rr-3.png"],
+    "RP": ["rp-1.png", "rp-2.png", "rp-3.png"],
+    "thumb-L": ["thumb-l-1.png", "thumb-l-2.png"],
+    "thumb-R": ["thumb-r-1.png", "thumb-r-2.png"]
+  }
+}

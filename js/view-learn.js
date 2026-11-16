@@ -9,31 +9,79 @@
     return '<span class="stars sm">' + '★'.repeat(n) + '<span class="off">' + '★'.repeat(3 - n) + '</span></span>';
   }
 
+  const RECO = '<span class="reco" title="La suite conseillée du parcours">Recommandé</span>';
+
+  // « Ouvert » (on peut jouer) et « validé » (terminé) sont deux choses différentes :
+  //   terminé / ouvert par la progression / déverrouillé (pas validé) / verrouillé.
+  // La barre de progression ne compte que les vraies réussites.
   function moduleCards() {
     const mods = C.modules;
+    const next = C.next();
     return (
       '<div class="modules">' +
       mods
         .map((m, i) => {
           const done = S().moduleDone(m);
-          const open = S().moduleUnlocked(mods, i);
+          const open = S().moduleOpen(mods, i);
+          const unlockedOnly = open && !done && !S().moduleReached(mods, i); // déverrouillé, pas encore atteint
           const prog = S().moduleProgress(m);
           const tot = S().moduleTotal(m);
           const skipped = S().state.modules[m.id] && S().state.modules[m.id].skipped;
           const pct = done ? 100 : (prog / tot) * 100;
-          const state = done ? (skipped ? 'Validé par test' : 'Terminé') : open ? prog + ' / ' + tot + ' étapes' : 'Verrouillé';
+          const rec = !!(next && next.module.id === m.id);
+          const state = done
+            ? '✓ ' + (skipped ? 'Validé par test' : 'Terminé')
+            : unlockedOnly
+              ? '🔓 Déverrouillé · non validé · ' + prog + ' / ' + tot
+              : open
+                ? prog + ' / ' + tot + ' étapes'
+                : '🔒 Verrouillé';
           return (
-            '<a class="mod ' + (done ? 'done' : open ? 'open' : 'locked') + '" href="#/module/' + m.id + '">' +
-            '<span class="mod-ico">' + DD.esc(m.icon) + '</span>' +
-            '<span class="mod-body"><span class="mod-num">Module ' + m.id + '</span><strong>' + DD.esc(m.title) + '</strong>' +
+            '<div class="mod ' + (done ? 'done' : unlockedOnly ? 'unlocked' : open ? 'open' : 'locked') + '">' +
+            '<a class="mod-link" href="#/module/' + m.id + '"><span class="mod-ico">' + DD.esc(m.icon) + '</span>' +
+            '<span class="mod-body"><span class="mod-num">Module ' + m.id + (rec ? ' ' + RECO : '') + '</span><strong>' + DD.esc(m.title) + '</strong>' +
             '<span class="progress thin"><span style="width:' + pct + '%"></span></span>' +
-            '<span class="mod-state">' + (done ? '✓ ' : !open ? '🔒 ' : '') + state + '</span></span></a>'
+            '<span class="mod-state">' + state + '</span></span></a>' +
+            (open ? '' : '<button class="btn small mod-unlock" data-unlock-module="' + m.id + '">Déverrouiller</button>') +
+            '</div>'
           );
         })
         .join('') +
       '</div>'
     );
   }
+
+  // Boutons « Déverrouiller » (un clic suffit, avec un simple message) et interrupteur « Tout déverrouiller »
+  function bindUnlocks(root) {
+    const msg = (what, target) => {
+      const adv = C.adviceAfter(target);
+      DD.toast(what + (adv ? ' Cet exercice est conseillé après ' + DD.esc(adv) + '.' : ''));
+    };
+    root.querySelectorAll('[data-unlock-module]').forEach((b) => {
+      b.onclick = () => {
+        const m = C.modules.find((x) => x.id === +b.dataset.unlockModule);
+        S().unlockModule(m.id);
+        msg('Module déverrouillé.', { module: m });
+        DD.router.reload();
+      };
+    });
+    root.querySelectorAll('[data-unlock-lesson]').forEach((b) => {
+      b.onclick = () => {
+        const f = C.find(b.dataset.unlockLesson);
+        S().unlockLesson(f.lesson.id);
+        msg('Leçon déverrouillée.', f);
+        DD.router.reload();
+      };
+    });
+    const all = root.querySelector('#unlock-all');
+    if (all)
+      all.onchange = () => {
+        S().setUnlockAll(all.checked);
+        DD.toast(all.checked ? 'Tout est déverrouillé. Le parcours conseillé reste indiqué par « Recommandé ».' : 'Retour au parcours conseillé. Tes validations sont conservées.');
+        DD.router.reload();
+      };
+  }
+  V.bindUnlocks = bindUnlocks;
 
   function ring(value, label, sub) {
     const r = 36,
@@ -87,6 +135,7 @@
       '<h2>Les 10 modules</h2>' + moduleCards() +
       '</section>';
 
+    bindUnlocks(root);
     const form = root.querySelector('#name-form');
     if (form)
       form.onsubmit = (e) => {
@@ -102,9 +151,12 @@
 
   V.lessons = function (root) {
     root.innerHTML =
-      '<section class="page"><h1>Leçons</h1><p class="lead">Dix modules, du plus simple au plus complet. Un module se débloque quand le précédent est terminé, ou validé par un test de passage.</p>' +
+      '<section class="page"><h1>Leçons</h1><p class="lead">Dix modules, du plus simple au plus complet. L\'ordre est conseillé, jamais obligatoire : la suite du parcours est marquée « Recommandé », et tu peux déverrouiller n\'importe quel module d\'un clic.</p>' +
+      '<div class="card unlock-card"><label class="check"><input type="checkbox" id="unlock-all"' + (S().isUnlockAll() ? ' checked' : '') + '> <b>Tout déverrouiller</b></label>' +
+      '<p class="muted small">Ouvre tous les modules et toutes les leçons d\'un coup. Déverrouiller ne valide rien : pas d\'étoiles, pas de badge, pas de progression tant que tu n\'as pas réussi l\'exercice. Tu peux le désactiver quand tu veux, tes validations sont gardées.</p></div>' +
       '<div class="notice">Envie de répéter une touche ou un doigt précis, sans suivre le parcours ? <a href="#/atelier"><b>Ouvre l\'atelier de répétitions</b></a>.</div>' +
       moduleCards() + '</section>';
+    bindUnlocks(root);
   };
 
   // ---- Module -------------------------------------------------------------------------------
@@ -119,18 +171,21 @@
   function endCard(m, open) {
     const lessonsOk = S().lessonsDone(m);
     const moduleOk = S().moduleDone(m);
+    const free = S().freeAccess(m); // module déverrouillé : pas d'ordre imposé non plus pour la fin de module
+    const next = C.next();
     const rows = C.END_STEPS.map((step, i) => {
       const done = S().endDone(m.id, step);
       const prevDone = i === 0 || S().endDone(m.id, C.END_STEPS[i - 1]);
-      const can = open && (lessonsOk || moduleOk) && (prevDone || done);
+      const can = open && (lessonsOk || moduleOk || free) && (free || prevDone || done);
+      const rec = !!(next && next.end === step && next.module.id === m.id);
       const secs = C.END_SECONDS[step];
       const meta = step === 'revision' ? 'au moins ' + Math.max(150, C.seriesLen()) + ' caractères' : secs / 60 + ' min' + (step === 'mastery' ? ' · 95 % de précision' : '');
-      const body = '<span class="les-id">' + (i + 1) + '</span><span class="les-body"><strong>' + DD.esc(C.endLabel(m, step)) + '</strong><span class="muted small">' + meta + '</span></span><span class="les-stars">' + (done ? '✓' : '') + '</span>';
+      const body = '<span class="les-id">' + (i + 1) + '</span><span class="les-body"><strong>' + DD.esc(C.endLabel(m, step)) + '</strong>' + (rec ? ' ' + RECO : '') + '<span class="muted small">' + meta + '</span></span><span class="les-stars">' + (done ? '✓' : '') + '</span>';
       return can ? '<a class="les' + (done ? ' done' : '') + '" href="#/fin/' + m.id + '/' + step + '">' + body + '</a>' : '<div class="les locked' + (done ? ' done' : '') + '">' + body + '</div>';
     }).join('');
     return (
       '<h2>Fin du module</h2><p class="muted">' +
-      (lessonsOk || moduleOk ? "Trois séries d'endurance (avec une courte pause entre chaque), un test de maîtrise, puis une révision en mélange." : 'Se débloque quand toutes les leçons sont terminées.') +
+      (lessonsOk || moduleOk || free ? "Trois séries d'endurance (avec une courte pause entre chaque), un test de maîtrise, puis une révision en mélange." : 'Conseillé quand toutes les leçons sont terminées : déverrouille le module pour y accéder avant.') +
       '</p><div class="lesson-list">' + rows + '</div>'
     );
   }
@@ -140,48 +195,67 @@
     const idx = mods.findIndex((m) => m.id === +id);
     if (idx < 0) return (location.hash = '#/lecons');
     const m = mods[idx];
-    const open = S().moduleUnlocked(mods, idx);
+    const open = S().moduleOpen(mods, idx);
     const done = S().moduleDone(m);
+    const unlockedOnly = open && !done && !S().moduleReached(mods, idx); // déverrouillé, mais pas validé
+    const next = C.next();
     const layout = DD.Layout.current();
     const fingers = m.keys ? C.fingersFor(m.keys) : null;
     const rows = m.lessons
       .map((l) => {
         const r = S().lesson(l.id);
+        const lopen = S().lessonOpen(mods, m, l);
+        const rec = !!(next && next.lesson && next.lesson.id === l.id);
+        const single = lopen && !open && !(r && r.done); // leçon déverrouillée toute seule
         const meta = r && r.tries ? 'meilleur : ' + r.bestWpm + ' MPM · ' + DD.fmt.pct(r.bestAcc) : l.desc || '';
         const goal = l.minWpm ? '<span class="pill">≥ ' + l.minWpm + ' MPM</span>' : '';
         // Leçons en étapes : une pastille par étape (faite / à faire)
         const dots = l.staged
           ? '<span class="stage-dots">' + l.stages().map((st) => '<i class="' + (r && (r.done || (r.stages && r.stages[st] && r.stages[st].done)) ? 'on' : '') + '" title="' + DD.esc(C.STAGE_LABELS[st]) + '"></i>').join('') + '</span>'
           : '';
+        const tags = (rec ? ' ' + RECO : '') + (single ? ' <span class="pill soft">Déverrouillée</span>' : '');
         const body =
-          '<span class="les-id">' + l.id + '</span><span class="les-body"><strong>' + DD.esc(l.title) + '</strong> ' + goal + dots + '<span class="muted small">' + DD.esc(meta) + '</span></span>' +
+          '<span class="les-id">' + l.id + '</span><span class="les-body"><strong>' + DD.esc(l.title) + '</strong> ' + goal + tags + dots + '<span class="muted small">' + DD.esc(meta) + '</span></span>' +
           '<span class="les-stars">' + (r && r.done ? stars(r.stars) : '') + '</span>';
-        return open ? '<a class="les' + (r && r.done ? ' done' : '') + '" href="#/lecon/' + l.id + '">' + body + '</a>' : '<div class="les locked">' + body + '</div>';
+        return lopen
+          ? '<a class="les' + (r && r.done ? ' done' : '') + '" href="#/lecon/' + l.id + '">' + body + '</a>'
+          : '<div class="les locked">' + body + '<button class="btn small" data-unlock-lesson="' + l.id + '">Déverrouiller</button></div>';
       })
       .join('');
-    const prev = mods[idx - 1];
+    const advice = C.adviceAfter({ module: m });
     root.innerHTML =
       '<section class="page"><a class="back" href="#/lecons">← Tous les modules</a>' +
       '<div class="mod-head"><span class="mod-ico big">' + DD.esc(m.icon) + '</span><div><span class="mod-num">Module ' + m.id + (done ? ' · terminé ✓' : '') + '</span><h1>' + DD.esc(m.title) + '</h1></div></div>' +
       '<p class="lead">' + DD.esc(m.desc) + '</p>' +
-      (!open ? '<div class="notice">🔒 Termine d\'abord le module ' + prev.id + ' (« ' + DD.esc(prev.title) + ' »), ou valide-le avec un test de passage.</div>' : '') +
-      (fingers ? '<div class="card"><h3>Les doigts de ce module</h3><div id="m-hands"></div><div id="m-kb"></div></div>' : '') +
+      (!open
+        ? '<div class="notice unlock-note">🔒 <span>Ce module est conseillé après ' + DD.esc(advice || 'le début du parcours') + '. Tu peux quand même le déverrouiller, d\'un clic.</span> <button class="btn small primary" data-unlock-module="' + m.id + '">Déverrouiller le module</button></div>'
+        : unlockedOnly
+          ? '<div class="notice">🔓 Déverrouillé' + (advice ? ' : ce module est conseillé après ' + DD.esc(advice) : '') + '. Il reste « non validé » (pas d\'étoiles, pas de badge, pas de progression) tant que tu n\'as pas réussi les exercices.</div>'
+          : '') +
+      (fingers ? '<div class="card"><h3>Les doigts de ce module</h3><div id="m-kb"></div><div class="kbd-bar" id="m-bar"></div></div>' : '') +
       '<div class="lesson-list">' + rows + '</div>' +
       endCard(m, open) +
-      (m.skip && open && !done
-        ? '<div class="card skip"><h3>Tu connais déjà ces touches ?</h3><p>Le test de passage valide le module d\'un coup : il faut <b>95 %</b> de précision et au moins <b>' + m.skip.minWpm + ' MPM</b>. Il vérifie que tu connais les touches, pas la technique des dix doigts : joue le jeu !</p><a class="btn primary" href="#/passage/' + m.id + '">Passer le test de passage</a></div>'
+      (m.skip && !done
+        ? '<div class="card skip"><h3>Tu connais déjà ces touches ?</h3><p>Le test de passage valide le module d\'un coup, même s\'il est verrouillé : il faut <b>95 %</b> de précision et au moins <b>' + m.skip.minWpm + ' MPM</b>. Il vérifie que tu connais les touches, pas la technique des dix doigts : joue le jeu !</p><a class="btn primary" href="#/passage/' + m.id + '">Passer le test de passage</a></div>'
         : '') +
       '</section>';
+    bindUnlocks(root);
     if (fingers) {
-      root.querySelector('#m-hands').innerHTML = DD.Keyboard.hands({ active: fingers });
-      const kb = DD.Keyboard.create(layout, 'fingers');
+      const kb = DD.Keyboard.create(layout, 'fingers', { hands: true });
       const ids = [];
       Array.from(m.keys).forEach((c) => {
         const h = layout.hint(c);
-        if (h) ids.push(h.main);
+        if (h) ids.push(...(h.dead ? h.steps.flat() : [h.main]));
       });
       kb.setFocus(ids);
       root.querySelector('#m-kb').appendChild(kb.el);
+      if (kb.hands) kb.hands.highlight(fingers);
+      const demo = DD.Hands.demoBar(kb, { text: () => Array.from(m.keys).slice(0, 14).join(' ') });
+      root.querySelector('#m-bar').appendChild(demo.el);
+      return () => {
+        demo.stop();
+        if (kb.hands) kb.hands.destroy();
+      };
     }
   };
 
@@ -190,7 +264,8 @@
     const f = C.find(id);
     if (!f) return (location.hash = '#/lecons');
     const mods = C.modules;
-    if (!S().moduleUnlocked(mods, mods.indexOf(f.module))) return (location.hash = '#/module/' + f.module.id);
+    // Ouverte = module ouvert, ou leçon déverrouillée, ou leçon déjà validée (rejouable). Sinon : page du module (bouton « Déverrouiller »).
+    if (!S().lessonOpen(mods, f.module, f.lesson)) return (location.hash = '#/module/' + f.module.id);
     if (f.lesson.staged) return V.stagedLesson(root, f, stage); // leçon en étapes (view-lesson.js)
     const { module: m, lesson: l } = f;
     const run = DD.StrictRun(root, {
@@ -234,7 +309,8 @@
     const mods = C.modules;
     const idx = mods.findIndex((m) => m.id === +id);
     const m = mods[idx];
-    if (!m || !m.skip || !S().moduleUnlocked(mods, idx) || S().moduleDone(m)) return (location.hash = '#/module/' + id);
+    // Le test de passage reste possible même pour un module verrouillé : le réussir valide le module.
+    if (!m || !m.skip || S().moduleDone(m)) return (location.hash = '#/module/' + id);
     const run = DD.StrictRun(root, {
       title: 'Test de passage · ' + m.title,
       subtitle: 'Il faut ' + m.skip.minWpm + ' MPM et 95 % de précision pour valider tout le module d\'un coup. Utilise bien tes dix doigts !',
@@ -330,8 +406,10 @@
         focus: () => keysOf(side('R')),
       },
       {
-        t: 'Pouces et majuscules',
-        p: '<p>Les <b>pouces</b> tapent l\'espace (celui que tu veux, mais toujours le même). Pour une <b>majuscule</b> ou un <b>chiffre</b>, on tient Maj avec l\'auriculaire de <b>l\'autre main</b> : Maj droite pour une lettre de la main gauche, Maj gauche pour la main droite.</p>',
+        t: 'Majuscules, accents et touches mortes',
+        p: '<p>Les <b>pouces</b> tapent l\'espace (celui que tu veux, mais toujours le même). Pour une <b>majuscule</b> ou un <b>chiffre</b>, on tient Maj avec l\'auriculaire de <b>l\'autre main</b> : Maj droite pour une lettre de la main gauche, Maj gauche pour la main droite.</p>' +
+          '<p><b>Â, ê, î, ô, û</b> : appuie sur la touche <b>^</b> (auriculaire droit, à droite de P). <b>Rien ne s\'affiche : c\'est normal.</b> Puis appuie sur la voyelle. Pour <b>ä, ë, ï, ö, ü</b>, tiens Maj (auriculaire gauche) en appuyant sur <b>^</b> : cela donne le tréma ¨, puis la voyelle.</p>' +
+          '<p>Tu peux regarder la démo avec ê et ë : le doigt appuie d\'abord sur ^, puis sur la voyelle. Si ça ne marche pas sur ton clavier, ouvre la <a href="#/diagnostic">page de diagnostic</a>.</p>',
         hands: new Set(['TH', 'LP', 'RP']),
         focus: () => ['Space', 'ShiftL', 'ShiftR'],
       },
@@ -346,17 +424,37 @@
     root.innerHTML = '<section class="page"><h1>Guide : position des mains</h1><div id="g-card" class="card guide"></div><div class="dots" id="g-dots"></div></section>';
     const card = root.querySelector('#g-card');
     const dots = root.querySelector('#g-dots');
-    const kb = DD.Keyboard.create(layout, 'fingers');
+    const kb = DD.Keyboard.create(layout, 'fingers', { hands: true });
+    // texte joué par la démo à chaque étape (position de repos, un doigt par touche, mains, pouces et Maj)
+    const DEMOS = { 1: 'f j d k s l q m', 2: 'q s d f g h j k l m', 3: 'a z e r t q s d f g w x c v b', 4: 'y u i o p h j k l m n , ;', 5: 'A b P q 5 8 ê ë' };
+    let demo = null;
     function render() {
+      if (demo) demo.stop();
+      demo = null;
       const s = steps[i];
       card.innerHTML =
         '<div class="g-step">Étape ' + (i + 1) + ' sur ' + steps.length + '</div><h2>' + DD.esc(s.t) + '</h2>' + s.p +
-        (i >= 1 && i <= 5 ? '<div class="g-hands">' + DD.Keyboard.hands({ active: s.hands }) + '</div><div id="g-kb"></div>' : '') +
+        (i >= 1 && i <= 5 ? '<div id="g-kb"></div><div class="kbd-bar" id="g-bar"></div>' + (i === 2 ? '<p class="muted small">Clique sur une touche du clavier : la main te montre quel doigt s\'en occupe, comment il appuie, puis revient.</p>' : '') : '') +
         '<div class="actions"><button class="btn ghost" id="g-prev"' + (i === 0 ? ' disabled' : '') + '>← Précédent</button>' +
         (i < steps.length - 1 ? '<button class="btn primary" id="g-next">Suivant →</button>' : '<a class="btn primary" href="#/lecon/1.1">Commencer la leçon 1.1</a>') + '</div>';
       if (i >= 1 && i <= 5) {
         card.querySelector('#g-kb').appendChild(kb.el);
         kb.setFocus(s.focus());
+        if (kb.hands) {
+          kb.hands.relayout(); // le clavier vient de changer de conteneur
+          kb.hands.rest();
+          kb.hands.highlight(s.hands);
+        }
+        demo = DD.Hands.demoBar(kb, { text: () => DEMOS[i] });
+        card.querySelector('#g-bar').appendChild(demo.el);
+        // clic sur une touche : le bon doigt vient l'appuyer, puis retourne en position de repos
+        Object.keys(kb.byId).forEach((id) => {
+          kb.byId[id].style.cursor = 'pointer';
+          kb.byId[id].onclick = () => {
+            kb.setHandsVisible(true);
+            if (kb.hands) kb.hands.show([id], 1400);
+          };
+        });
       }
       dots.innerHTML = steps.map((_, k) => '<button class="dot' + (k === i ? ' on' : '') + '" data-k="' + k + '" aria-label="Étape ' + (k + 1) + '"></button>').join('');
       const p = card.querySelector('#g-prev'),
@@ -366,5 +464,9 @@
       dots.querySelectorAll('.dot').forEach((d) => (d.onclick = () => ((i = +d.dataset.k), render())));
     }
     render();
+    return () => {
+      if (demo) demo.stop();
+      if (kb.hands) kb.hands.destroy();
+    };
   };
 })();

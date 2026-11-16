@@ -33,6 +33,49 @@ for (const [name, chars] of [['rangée de base', C.HOME], ['rangée du haut', C.
   console.log('  ' + name.padEnd(16) + String(n).padStart(4) + ' mots' + (n >= G.MIN_WORDS ? '' : '  (moins de 30 : pas de mots réels, c\'est normal)'));
 }
 
+// 1 bis) Texte source : tout en NFC, jamais d'accent décomposé (e + U+0302), assez d'exemples de chaque lettre accentuée
+const ACC = Array.from('âêîôûëï');
+const asText = (x) => (typeof x === 'string' ? x : x && x.text) || '';
+console.log('\nLettres à touche morte dans le corpus (mots / phrases / paragraphes) :');
+for (const [name, list] of [['mots', T.WORDS], ['phrases simples', T.SIMPLE], ['phrases', T.SENTENCES], ['paragraphes', T.PASSAGES]]) {
+  list.forEach((x, i) => {
+    const t = asText(x);
+    if (t !== t.normalize('NFC')) bad(name + ' #' + i + ' : pas en NFC : ' + JSON.stringify(t.slice(0, 40)));
+    if (/\p{M}/u.test(t)) bad(name + ' #' + i + ' : accent décomposé (caractère combinant) : ' + JSON.stringify(t.slice(0, 40)));
+  });
+}
+const MIN_WORDS_PER_ACCENT = 8;
+const MIN_SENTENCES_PER_ACCENT = 2;
+for (const c of ACC) {
+  const w = T.WORDS.filter((x) => x.includes(c)).length;
+  const se = T.SENTENCES.filter((x) => x.includes(c)).length;
+  const pa = T.PASSAGES.filter((x) => asText(x).includes(c)).length;
+  console.log('  ' + c + '  ' + String(w).padStart(3) + ' mots  ' + String(se).padStart(2) + ' phrases  ' + String(pa).padStart(2) + ' paragraphes');
+  if (w < MIN_WORDS_PER_ACCENT) bad('pas assez de mots avec ' + c + ' (' + w + ' < ' + MIN_WORDS_PER_ACCENT + ')');
+  if (se < MIN_SENTENCES_PER_ACCENT) bad('pas assez de phrases avec ' + c + ' (' + se + ' < ' + MIN_SENTENCES_PER_ACCENT + ')');
+}
+// Dans le module 6, chaque leçon d'accents contient bien ses lettres nouvelles, plusieurs fois, à chaque étape
+const m6 = C.modules.find((m) => m.id === 6);
+for (const l of m6.lessons.filter((x) => x.staged)) {
+  const fresh = Array.from(l.newKeys).filter((c) => ACC.includes(c));
+  if (!fresh.length) continue;
+  for (let seed = 1; seed <= 15; seed++) {
+    for (const st of l.stages().filter((s) => s !== 'intro')) {
+      const t = C.stageContent(l, st, { seed }).text.toLowerCase();
+      for (const c of fresh) {
+        const n = Array.from(t).filter((x) => x === c).length;
+        if (n < 2) bad('leçon ' + l.id + '/' + st + ' (série ' + seed + ') : « ' + c + ' » seulement ' + n + ' fois');
+      }
+    }
+  }
+}
+for (const s of C.END_STEPS) {
+  for (let seed = 1; seed <= 15; seed++) {
+    const t = C.endContent(m6, s, { seed }).text.toLowerCase();
+    for (const c of ACC) if (!t.includes(c)) bad('fin du module 6 / ' + s + ' (série ' + seed + ') : aucune lettre « ' + c + ' »');
+  }
+}
+
 // 2) Tout le contenu est tapable
 let texts = 0;
 for (const id of ['mac', 'pc']) {

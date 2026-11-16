@@ -43,7 +43,7 @@
       '<div class="run-stats"><span id="rs-prog"></span><div class="progress"><span id="rs-bar"></span></div></div>' +
       '<div id="rs-text" class="tt-wrap"></div>' +
       '<div id="rs-hint" class="hint" aria-live="polite"></div>' +
-      '<div class="kbd-bar"><button class="btn small ghost" id="rs-kbtoggle"></button><span class="muted small">Échap : recommencer avec un nouveau contenu</span></div>' +
+      '<div class="kbd-bar"><button class="btn small ghost" id="rs-kbtoggle"></button><button class="btn small ghost" id="rs-handtoggle"></button><span id="rs-demo-slot"></span><span class="muted small">Échap : recommencer avec un nouveau contenu</span></div>' +
       '<div id="rs-kb"></div>' +
       '<div id="rs-result" hidden></div>';
     root.appendChild(page);
@@ -55,22 +55,62 @@
     $('rs-text').appendChild(tv.el);
     tv.caret(0);
 
-    const kb = DD.Keyboard.create(layout, 'fingers');
+    const kb = DD.Keyboard.create(layout, 'fingers', { hands: true }); // mains semi-transparentes sur le clavier
     $('rs-kb').appendChild(kb.el);
 
     const showKb = () => S.state.settings.showKeyboard;
+    const handsOn = () => S.state.settings.showHands !== false;
     function refreshKbVisibility() {
       const on = showKb();
-      $('rs-kb').hidden = !on;
+      $('rs-kb').hidden = !on; // le clavier masqué emporte les mains avec lui
       $('rs-hint').hidden = !on;
       $('rs-kbtoggle').textContent = on ? 'Masquer le clavier' : 'Afficher le clavier';
+      $('rs-handtoggle').hidden = !on;
+      $('rs-demo-slot').hidden = !on;
+      $('rs-handtoggle').textContent = handsOn() ? 'Masquer les mains' : 'Afficher les mains';
     }
+    $('rs-handtoggle').onclick = () => {
+      S.state.settings.showHands = !handsOn();
+      S.save();
+      kb.setHandsVisible(handsOn());
+      refreshKbVisibility();
+      if (kb.hands && handsOn()) updateHint();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    };
+
+    // Démo : les mains tapent seules le texte de l'exercice (avant de commencer ; rien n'est compté)
+    let demoMarked = [];
+    const demoBar = DD.Hands.demoBar(kb, {
+      text: () => cfg.text,
+      canStart: () => !t0 && !done,
+      onChar(i, ch, phase) {
+        if (phase === 'start') {
+          tv.caret(i);
+          tv.scroll();
+        } else {
+          tv.set(i, 'demo');
+          demoMarked.push(i);
+        }
+      },
+      onEnd() {
+        demoMarked.forEach((i) => tv.set(i, ''));
+        demoMarked = [];
+        tv.caret(done ? -1 : idx);
+        tv.scroll();
+        updateHint();
+      },
+    });
+    $('rs-demo-slot').appendChild(demoBar.el);
+    // Touche morte en attente (^ ou ¨) : le clavier et les mains montrent d'abord la touche morte, puis la voyelle.
+    let pending = null;
     function updateHint() {
       const ch = chars[idx];
       if (ch == null) return;
       const h = layout.hint(ch);
-      kb.setNext(h ? h.keys : []);
-      $('rs-hint').innerHTML = DD.hintHTML(ch, layout);
+      let ids = [];
+      if (h) ids = h.steps.length > 1 ? (pending && pending === h.deadChar ? h.steps[1] : h.steps[0]) : h.keys;
+      kb.setNext(ids);
+      $('rs-hint').innerHTML = DD.hintHTML(ch, layout, pending);
     }
     function updateProgress() {
       if (timed) {
@@ -148,7 +188,39 @@
       if (!done && t0 && (performance.now() - t0) / 1000 >= cfg.timeLimit) finish(true);
     }
 
-    function onKey({ key }) {
+    // Le chronomètre démarre à la première frappe, touche morte comprise
+    function startClock() {
+      if (!t0) {
+        t0 = performance.now();
+        demoBar.setEnabled(false);
+        if (timed) timer = setInterval(tickTimer, 200);
+      }
+    }
+
+    function onKey({ key, type, resolved }) {
+      if (demoBar.running()) {
+        demoBar.stop(); // n'importe quelle touche arrête la démo, sans être comptée
+        return;
+      }
+      // ---- touche morte : état intermédiaire, ni erreur, ni avance du curseur, le chronomètre continue ----
+      if (type === 'dead') {
+        if (done) return;
+        DD.Audio.unlock();
+        DD.Audio.click(false);
+        startClock();
+        S.tick();
+        if (showKb()) sawKeyboard = true;
+        pending = key;
+        tv.ghost(idx, key); // la touche morte s'affiche en grisé sur le caractère attendu
+        updateHint(); // deuxième étape : la voyelle
+        return;
+      }
+      if (type === 'deadend') {
+        pending = null;
+        tv.ghost(-1);
+        if (!resolved) updateHint(); // annulée (Retour arrière, Échap...) : on revient à la première étape
+        return;
+      }
       if (key === 'Escape') {
         cfg.restart();
         return;
@@ -159,10 +231,7 @@
       }
       if (key === 'Backspace' || key === 'Enter') return;
       DD.Audio.unlock();
-      if (!t0) {
-        t0 = performance.now();
-        if (timed) timer = setInterval(tickTimer, 200);
-      }
+      startClock();
       S.tick();
       if (showKb()) sawKeyboard = true;
       const exp = chars[idx];
@@ -189,6 +258,9 @@
         DD.Audio.error();
         tv.caret(idx, true);
         if (pressed) kb.flash(pressed, 'bad');
+        kb.markError(); // secousse du doigt attendu + éclat rouge discret sur la touche attendue
+        const hh = layout.hint(exp);
+        if (hh && hh.dead) updateHint(); // combinaison ratée (« ^p ») : on recommence à la touche morte
       }
     }
 
@@ -196,6 +268,8 @@
     return {
       destroy() {
         clearInterval(timer);
+        demoBar.stop();
+        if (kb.hands) kb.hands.destroy();
         detach();
         S.save();
       },

@@ -239,7 +239,7 @@ function legacySite() {
 test('migration : étoiles, historique, badges, séries et réglages sont conservés', () => {
   const D = legacySite();
   const st = D.Store.state;
-  assert.equal(st.schema, 2);
+  assert.equal(st.schema, 3);
   assert.equal(st.profile.name, 'Camille');
   assert.equal(st.settings.layout, 'pc');
   assert.equal(st.settings.sound, false);
@@ -295,7 +295,7 @@ test('migration : un ancien fichier exporté s\'importe, et on ne perd rien', ()
   const again = loadSite(SITE_BASE);
   assert.equal(again.Store.importJSON(json).ok, true);
   assert.equal(JSON.stringify(again.Store.state.lessons), JSON.stringify(D.Store.state.lessons));
-  assert.equal(again.Store.state.schema, 2);
+  assert.equal(again.Store.state.schema, 3);
   assert.equal(JSON.stringify(again.Store.state.badges), JSON.stringify(D.Store.state.badges));
 });
 

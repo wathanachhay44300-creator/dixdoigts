@@ -26,17 +26,27 @@
       '<div class="hud"><div><b id="h-time">0:00</b><span>temps</span></div><div><b id="h-wpm">0</b><span>MPM</span></div><div><b id="h-acc">100 %</b><span>précision</span></div></div>' +
       '<div id="t-text" class="tt-wrap"></div>' +
       '<p class="muted" id="t-help">Le chrono démarre à ta première frappe. Échap : recommencer avec un nouveau texte. Retour arrière pour corriger.</p>' +
-      '<div class="kbd-bar"><button class="btn small ghost" id="t-kbtoggle"></button></div><div id="t-kb"></div>' +
+      '<div class="kbd-bar"><button class="btn small ghost" id="t-kbtoggle"></button><button class="btn small ghost" id="t-handtoggle"></button></div><div id="t-kb"></div>' +
       '<div id="t-result" hidden></div></section>';
     const $ = (id) => root.querySelector('#' + id);
-    const kb = DD.Keyboard.create(layout, 'fingers');
+    const kb = DD.Keyboard.create(layout, 'fingers', { hands: true }); // les mains suivent chaque frappe
     $('t-kb').appendChild(kb.el);
 
+    const handsOn = () => S().state.settings.showHands !== false;
     function refreshKb() {
       const on = S().state.settings.showKeyboard;
-      $('t-kb').hidden = !on;
+      $('t-kb').hidden = !on; // clavier masqué : les mains aussi
       $('t-kbtoggle').textContent = on ? 'Masquer le clavier' : 'Afficher le clavier';
+      $('t-handtoggle').hidden = !on;
+      $('t-handtoggle').textContent = handsOn() ? 'Masquer les mains' : 'Afficher les mains';
     }
+    $('t-handtoggle').onclick = () => {
+      S().state.settings.showHands = !handsOn();
+      S().save();
+      kb.setHandsVisible(handsOn());
+      refreshKb();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    };
     $('t-kbtoggle').onclick = () => {
       S().state.settings.showKeyboard = !S().state.settings.showKeyboard;
       S().save();
@@ -207,7 +217,21 @@
       box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    function onKey({ key }) {
+    function onKey({ key, type }) {
+      // touche morte (^ ou ¨) en attente : ni erreur, ni avance ; le chronomètre démarre et continue
+      if (type === 'dead') {
+        if (phase === 'done') return;
+        DD.Audio.unlock();
+        if (phase === 'ready') start();
+        if (S().state.settings.showKeyboard) sawKb = true;
+        S().tick();
+        tv.ghost(idx, key);
+        return;
+      }
+      if (type === 'deadend') {
+        tv.ghost(-1);
+        return;
+      }
       if (key === 'Escape') {
         build();
         return;
@@ -265,6 +289,7 @@
     const detach = DD.Input.attach(onKey);
     return () => {
       clearInterval(timer);
+      if (kb.hands) kb.hands.destroy();
       detach();
       S().save();
     };

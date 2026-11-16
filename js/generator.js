@@ -38,8 +38,8 @@
     q: 'LP', s: 'LR', d: 'LM', f: 'LI', g: 'LI', h: 'RI', j: 'RI', k: 'RM', l: 'RR', m: 'RP',
     w: 'LP', x: 'LR', c: 'LM', v: 'LI', b: 'LI', n: 'RI',
   };
-  const VOWELS = new Set(Array.from('aeiouyéèàùêâîôû'));
-  const LETTER = /^[a-zéèàùçêâîôû]$/;
+  const VOWELS = new Set(Array.from('aeiouyéèàùêâîôûëï'));
+  const LETTER = /^[a-zéèàùçêâîôûëï]$/;
 
   // ---- Hasard avec graine (mulberry32) ----------------------------------------------------------
   function rng(seed) {

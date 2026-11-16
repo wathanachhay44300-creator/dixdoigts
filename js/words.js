@@ -91,6 +91,9 @@
     maîtriser plaît gîte abîmer traîneau chaîne boîte fraîche naître
     rôti pôle hôte arôme cône tôle côte côtes diplômé drôlement
     brûler brûlé mûre sûrement flûtes piqûres goûts goûté
+    noël noëls canoë canoës aiguë ciguë ambiguë contiguë exiguë
+    naïf naïve naïfs naïves maïs haïr égoïste héroïque héroïne coïncidence coïncider ouïe païen aïeul aïeux
+    laïque mosaïque mosaïques faïence stoïque glaïeul inouï ambiguïté archaïque caïman
   `;
 
   const uniq = (s) => Array.from(new Set(s.split(/\s+/).filter(Boolean).map((w) => w.normalize('NFC'))));
@@ -154,7 +157,30 @@
     'Mes voisins reviennent du marché avec un panier de légumes.',
     "L'été dernier, nous avons visité une île magnifique.",
     "Je ne savais pas qu'il fallait autant de patience !",
+    'Joël a offert un canoë à Maëlle pour Noël.',
+    'Ma grand-mère a fait une mosaïque naïve pour sa cuisine.',
+    'Le maïs pousse bien cet été, même sous la pluie.',
+    "Il a fêté ses vingt ans dans un hôtel près de l'île.",
+    "La forêt était silencieuse, et l'air froid avait un goût de neige.",
     "Le chef a goûté la soupe, puis il a ajouté un peu de sel.",
+    'Le bâtiment est très âgé, mais il reste beau.',
+    'Le gâteau est prêt : goûte-le avant les autres !',
+    'Le château domine la vallée, et la brume se lève tôt.',
+    'Nos hôtes ont ouvert la porte avec un grand sourire.',
+    'Il a mûri depuis son voyage : il est plus sûr de lui.',
+    'Nous avons été surpris par une odeur de brûlé.',
+    'Raphaël et Michaël ont aidé Maëlle à ranger le canoë.',
+    'Noël approche, et la maison sent déjà la cannelle.',
+    'La chaîne de montagnes se perd dans les nuages.',
+    "Mon frère s'est coupé le doigt en ouvrant la boîte.",
+    'Il faut que tu te dépêches, sinon tu rateras le train.',
+    "Vous êtes arrivés tôt : le déjeuner n'est pas encore prêt.",
+    'Le maître a corrigé la dictée, puis il a rangé les cahiers.',
+    "La fête de l'école est un beau moment pour tout le monde.",
+    'Ma mère a pâli en lisant la lettre, puis elle a souri.',
+    'Il a laissé sa veste près du poêle, sur le dos de la chaise.',
+    'Ce vêtement est trop grand pour moi : je préfère le bleu.',
+    "Un bateau a dérivé sous un ciel gris, loin de l'île.",
   ];
 
   const NAMES = 'Marie Paul Sophie Lucas Julie Thomas Emma Louis Camille Hugo Clara Alice Jules Adam Manon Enzo Nina Victor Quentin Wendy Xavier Yann Karim Bruno Gaston Hélène'.split(' ');
