@@ -23,21 +23,21 @@
 
   // Doigts : longueur (de l'articulation de la base au bout, doigt tendu), largeur, léger écartement au repos.
   const SPEC = {
-    LP: { len: 3.7, width: 0.8, fan: -0.12 },
+    LP: { len: 3.7, width: 0.8, fan: -0.09 },
     LR: { len: 4.6, width: 0.9, fan: -0.04 },
     LM: { len: 5.0, width: 0.94, fan: 0 },
     LI: { len: 4.6, width: 0.94, fan: 0.1 },
     RI: { len: 4.6, width: 0.94, fan: -0.1 },
     RM: { len: 5.0, width: 0.94, fan: 0 },
     RR: { len: 4.6, width: 0.9, fan: 0.04 },
-    RP: { len: 3.7, width: 0.8, fan: 0.12 },
+    RP: { len: 3.7, width: 0.8, fan: 0.09 },
   };
   Object.values(SPEC).forEach((s) => (s.seg = SEG));
   const THUMB = { l1: 2.5, l2: 1.9, w1: 1.08, w2: 0.98 };
 
   const FLEX = [75, 85, 55]; // degrés de flexion ajoutés par phalange quand le doigt est entièrement replié
   const C_MAX = 0.62; // repli maximal utile (au-delà, le bout passerait derrière l'articulation)
-  const REST_RATIO = 0.56; // au repos, le bout est à 56 % de la longueur du doigt : le doigt est arrondi, prêt à s'étendre
+  const REST_RATIO = 0.44; // au repos, le bout est à 56 % de la longueur du doigt : le doigt est arrondi, prêt à s'étendre
   const SHIFT_FROM = 0.94; // au-delà de 94 % de la longueur, la main avance un peu avec le doigt
 
   const rad = (d) => (d * Math.PI) / 180;

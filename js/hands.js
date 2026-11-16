@@ -19,17 +19,20 @@
   const OMEGA = { lent: 16, normal: 23, rapide: 31 }; // raideur du ressort : ~95 % du trajet en 0,29 s / 0,2 s / 0,15 s
   const DIP = 0.09; // enfoncement du bout du doigt à l'appui (en touches)
   const SHAKE = 0.08; // amplitude de la secousse d'erreur
+  const WSCALE = 0.74; // doigts plus fins que les touches : on voit bien les espaces entre eux (style de la capture)
+  const THUMB_W = 1.12; // largeur du pouce (en touches)
   const WF = [1, 0.96, 0.9, 0.78]; // largeur relative du doigt à la base de chaque phalange, puis au bout
   const OVERLAP = 0.12; // chevauchement des phalanges (en largeurs de doigt), pour qu'aucune jointure ne laisse de vide
 
-  // Teintes : clair, milieu, ombre, contour, ongle, joue. 'fantome' = bleu translucide, cohérent avec le thème.
+  // Teintes : remplissage et contour fin. 'blanc' (par défaut) = blanc translucide, comme sur la capture de référence.
   const TINTS = {
-    claire: { hi: '#f8e0cf', mid: '#e8b89b', lo: '#b98468', line: '#82533d', nail: '#f9e8e0', blush: '#e99d90' },
-    moyenne: { hi: '#ebc29d', mid: '#cc9065', lo: '#935d3c', line: '#6a3d25', nail: '#f1d6c2', blush: '#d9856d' },
-    foncee: { hi: '#bd855d', mid: '#8d5a3a', lo: '#52301f', line: '#33190d', nail: '#cfa890', blush: '#9d5d46' },
-    fantome: { hi: '#e4eeff', mid: '#a9c1ff', lo: '#5b7de6', line: '#2f4fb5', nail: '#f1f5ff', blush: '#93abf6' },
+    blanc: { fill: '#ffffff', line: '#98a2b3' },
+    claire: { fill: '#fbe2d0', line: '#c8a38d' },
+    moyenne: { fill: '#e2b28a', line: '#a87c59' },
+    foncee: { fill: '#a66f48', line: '#6d4830' },
+    fantome: { fill: '#d9e5ff', line: '#8ba2e6' },
   };
-  const TINT_NAMES = { claire: 'Peau claire', moyenne: 'Peau moyenne', foncee: 'Peau foncée', fantome: 'Fantôme bleu' };
+  const TINT_NAMES = { blanc: 'Blanc translucide', claire: 'Peau claire', moyenne: 'Peau moyenne', foncee: 'Peau foncée', fantome: 'Fantôme bleu' };
 
   let UID = 0;
   let perfLevel = 0; // 0 : normal · 1 : allégé (sans ombres) · 2 : sans animation
@@ -84,8 +87,8 @@
     const s = (DD.Store && DD.Store.state.settings) || {};
     return {
       visible: s.showHands !== false,
-      opacity: clamp(Number(s.handOpacity) || 50, 20, 80) / 100,
-      tint: TINTS[s.handTint] ? s.handTint : 'moyenne',
+      opacity: clamp(Number(s.handOpacity) || 62, 20, 80) / 100,
+      tint: TINTS[s.handTint] ? s.handTint : 'blanc',
       speed: OMEGA[s.handSpeed] ? s.handSpeed : 'normal',
     };
   }
@@ -174,28 +177,18 @@
     let svg = null;
 
     // ---- Dessin ----------------------------------------------------------------------------------------------------------------
+    // Style : formes pleines d'une seule couleur (blanc translucide), SANS dégradé ni ombre. Le contour fin est tracé par un filtre
+    // autour de la silhouette entière : il n'y a donc aucune ligne aux articulations. La translucidité vient de l'opacité du calque.
     function buildDefs() {
       const p = 'h' + uid;
       const defs = svgEl('defs', null, svg);
-      const stop = (g, off, v, op) => svgEl('stop', { offset: off, style: 'stop-color: var(--skin-' + v + ');' + (op != null ? 'stop-opacity:' + op : '') }, g);
-      // cylindre : bords plus sombres, centre éclairé
-      const h = svgEl('linearGradient', { id: p + 'H', x1: 0, y1: 0, x2: 1, y2: 0 }, defs);
-      [['0', 'lo'], ['0.2', 'mid'], ['0.5', 'hi'], ['0.8', 'mid'], ['1', 'lo']].forEach((s) => stop(h, s[0], s[1]));
-      // paume : plus claire vers les doigts
-      const v = svgEl('linearGradient', { id: p + 'V', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-      [['0', 'hi'], ['0.55', 'mid'], ['1', 'lo']].forEach((s) => stop(v, s[0], s[1]));
-      // renflement du pouce et reflets
-      const rg = svgEl('radialGradient', { id: p + 'R', cx: 0.5, cy: 0.5, r: 0.5 }, defs);
-      stop(rg, '0', 'hi', 0.85);
-      stop(rg, '1', 'hi', 0);
-      // ongle
-      const ng = svgEl('linearGradient', { id: p + 'N', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-      svgEl('stop', { offset: 0, style: 'stop-color:#fff;stop-opacity:.85' }, ng);
-      svgEl('stop', { offset: 0.45, style: 'stop-color: var(--skin-nail);stop-opacity:.95' }, ng);
-      svgEl('stop', { offset: 1, style: 'stop-color: var(--skin-blush);stop-opacity:.55' }, ng);
-      // ombre douce portée par chaque main
-      const f = svgEl('filter', { id: p + 'S', x: '-20%', y: '-20%', width: '140%', height: '150%' }, defs);
-      svgEl('feDropShadow', { dx: 0, dy: 0.1, stdDeviation: 0.12, 'flood-color': '#24130a', 'flood-opacity': 0.42 }, f);
+      const f = svgEl('filter', { id: p + 'O', x: '-10%', y: '-10%', width: '120%', height: '120%' }, defs);
+      st.morph = svgEl('feMorphology', { in: 'SourceAlpha', operator: 'dilate', radius: 0.03, result: 'd' }, f);
+      svgEl('feFlood', { style: 'flood-color: var(--hand-line)', result: 'c' }, f);
+      svgEl('feComposite', { in: 'c', in2: 'd', operator: 'in', result: 'o' }, f);
+      const mg = svgEl('feMerge', null, f);
+      svgEl('feMergeNode', { in: 'o' }, mg);
+      svgEl('feMergeNode', { in: 'SourceGraphic' }, mg);
       return p;
     }
 
@@ -206,63 +199,38 @@
         out.image = svgEl('image', { x: -wb / 2, y: -len, width: wb, height: len, preserveAspectRatio: 'none', href: resolveUrl(imgUrl) }, g);
         return out;
       }
-      const d = segPath(wb, wt, len);
-      svgEl('path', { class: 'skin', d, fill: 'url(#' + st.pid + 'H)' }, g);
-      out.shade = svgEl('path', { class: 'shade', d, fill: '#2a1208', opacity: 0 }, g);
-      // pli de l'articulation (base de la phalange) : un trait fin et doux
-      if (kind !== 'first') svgEl('path', { class: 'crease', d: 'M ' + -wb * 0.36 + ' ' + -len * 0.04 + ' Q 0 ' + len * 0.06 + ' ' + wb * 0.36 + ' ' + -len * 0.04, fill: 'none' }, g);
-      // reflet doux le long de la phalange : donne du volume (cylindre éclairé par le haut)
-      svgEl('rect', { class: 'spec', x: -wb * 0.2, y: -len * 0.9, width: wb * 0.22, height: len * 0.78, rx: wb * 0.11, fill: '#fff', opacity: 0.2 }, g);
+      svgEl('path', { class: 'skin', d: segPath(wb, wt, len) }, g);
       return out;
     }
 
-    // Ongle : dessiné au bout du doigt (centré sur l'origine), pas sur la phalange, pour rester visible à toute flexion
-    function makeNail(parent, w) {
-      const ng = svgEl('g', { class: 'nail' }, parent);
-      svgEl('rect', { x: -w * 0.29, y: -w * 0.34, width: w * 0.58, height: w * 0.62, rx: w * 0.22, fill: 'url(#' + st.pid + 'N)' }, ng);
-      svgEl('ellipse', { cx: -w * 0.07, cy: -w * 0.16, rx: w * 0.08, ry: w * 0.1, fill: '#fff', opacity: 0.6 }, ng);
-      return ng;
-    }
-
     function buildHand(side) {
-      const g = svgEl('g', { class: 'hand hand-' + side, 'data-hand': side, filter: 'url(#' + st.pid + 'S)' }, svg);
-      const h = { side, g, palm: null, palmPath: null, thenar: null, shadowOn: true, shift: { x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0 }, fingers: {}, thumb: null, handImage: null };
+      const g = svgEl('g', { class: 'hand hand-' + side, 'data-hand': side }, svg);
+      const h = { side, g, palmPath: null, shift: { x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0 }, fingers: {}, thumb: null, handImage: null };
       const inner = svgEl('g', { class: 'hand-inner' }, g);
       h.inner = inner;
       if (images.cfg && images.cfg.mode === 'per-hand') {
         h.handImage = svgEl('image', { class: 'hand-image', preserveAspectRatio: 'xMidYMid meet', href: resolveUrl(images.cfg.hands[side === 'L' ? 'left' : 'right']) }, inner);
       } else {
-        // paume + avant-bras qui s'estompe
-        const palm = svgEl('g', { class: 'palm', mask: 'url(#' + st.pid + 'M' + side + ')' }, inner);
-        h.palmPath = svgEl('path', { class: 'skin palm-skin', fill: 'url(#' + st.pid + 'V)' }, palm);
-        h.thenar = svgEl('ellipse', { class: 'thenar', fill: 'url(#' + st.pid + 'R)' }, palm);
-        h.knuckles = [0, 1, 2, 3].map(() => svgEl('ellipse', { class: 'knuckle', fill: 'url(#' + st.pid + 'R)', opacity: 0.55 }, palm));
-        h.creases = [0, 1].map(() => svgEl('path', { class: 'crease', fill: 'none' }, palm));
-        // masque du bas de l'avant-bras
-        const defs = svg.querySelector('defs');
-        const mk = svgEl('mask', { id: st.pid + 'M' + side, maskUnits: 'userSpaceOnUse', x: -50, y: -50, width: 200, height: 200 }, defs);
-        h.maskRect = svgEl('rect', { x: -50, y: -50, width: 200, height: 200, fill: 'url(#' + st.pid + 'F' + side + ')' }, mk);
-        h.fade = svgEl('linearGradient', { id: st.pid + 'F' + side, gradientUnits: 'userSpaceOnUse', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-        svgEl('stop', { offset: 0, 'stop-color': '#fff' }, h.fade);
-        svgEl('stop', { offset: 0.5, 'stop-color': '#fff' }, h.fade);
-        svgEl('stop', { offset: 1, 'stop-color': '#000' }, h.fade);
+        g.setAttribute('filter', 'url(#' + st.pid + 'O)');
+        h.palmPath = svgEl('path', { class: 'skin palm-skin' }, inner); // paume et poignet : une seule forme lisse
       }
       // pouce (deux segments), puis les quatre doigts par-dessus
       const useSeg = images.cfg && images.cfg.mode === 'per-segment';
       const thumbImgs = useSeg && images.cfg.segments['thumb-' + side];
       const tg = svgEl('g', { class: 'finger thumb', 'data-f': 'TH-' + side }, inner);
+      if (!h.handImage) tg.setAttribute('filter', 'url(#' + st.pid + 'O)'); // le pouce est cerclé d'un contour fin, même sur la paume
       tg.style.setProperty('--fc', DD.Layout.FINGERS.TH.color);
       const T = M.THUMB;
+      const TW1 = T.w1 * 0.74;
+      const plainThumb = !h.handImage && !useSeg;
       h.thumb = {
         g: tg,
         spec: T,
-        // mode « une image par main » : l'image montre déjà la main entière, on ne dessine pas les doigts en plus
-        segs: h.handImage
+        // sans images : un pouce = une forme arrondie et courte (comme sur la capture), de la base au bout
+        shape: plainThumb ? svgEl('path', { class: 'skin thumb-skin' }, tg) : null,
+        segs: h.handImage || plainThumb
           ? []
-          : [
-              buildSegment(tg, T.w1, T.w1 * 0.9, T.l1, 'first', thumbImgs && thumbImgs[0]),
-              buildSegment(tg, T.w1 * 0.9, T.w2 * 0.8, T.l2, 'thumb-last', thumbImgs && thumbImgs[1]),
-            ],
+          : [buildSegment(tg, TW1, TW1 * 0.92, T.l1, 'first', thumbImgs && thumbImgs[0]), buildSegment(tg, TW1 * 0.92, TW1 * 0.78, T.l2, 'thumb-last', thumbImgs && thumbImgs[1])],
         tip: { x: 0, y: 0, vx: 0, vy: 0 },
         tgt: { x: 0, y: 0 },
         base: { x: 0, y: 0 },
@@ -270,21 +238,21 @@
         active: null,
         press: 0,
         shake: 0,
-        halo: svgEl('circle', { class: 'halo', r: 0.55, cx: 0, cy: 0 }, inner),
+        halo: svgEl('circle', { class: 'halo', r: 0.5, cx: 0, cy: 0 }, inner),
+        nail: null,
       };
-      h.thumb.nail = h.handImage ? null : makeNail(inner, T.w2 * 0.9);
       const codes = side === 'L' ? ['LP', 'LR', 'LM', 'LI'] : ['RI', 'RM', 'RR', 'RP'];
       codes.forEach((code) => {
         const spec = M.SPEC[code];
-        const W = spec.width;
+        const W = spec.width * WSCALE;
         const fg = svgEl('g', { class: 'finger', 'data-f': code }, inner);
         const imgs = useSeg && images.cfg.segments[code];
         // les deux premières phalanges dépassent un peu sous la suivante : aucune jointure ne laisse de vide
         const segs = h.handImage ? [] : [0, 1, 2].map((i) => buildSegment(fg, W * WF[i], W * WF[i + 1], spec.len * spec.seg[i] + (i < 2 ? OVERLAP * W : 0), i === 0 ? 'first' : i === 2 ? 'last' : 'mid', imgs && imgs[i]));
         fg.style.setProperty('--fc', DD.Layout.FINGERS[code].color);
-        const nail = h.handImage ? null : makeNail(fg, W * WF[3] * 1.15);
-        const halo = svgEl('circle', { class: 'halo', r: 0.55, cx: 0, cy: 0, style: 'fill:' + DD.Layout.FINGERS[code].color }, fg);
-        h.fingers[code] = { code, side, spec, g: fg, segs, nail, halo, mcp: { x: 0, y: 0 }, home: { x: 0, y: 0 }, tip: { x: 0, y: 0, vx: 0, vy: 0 }, tgt: { x: 0, y: 0 }, active: null, press: 0, shake: 0 };
+        const cap = h.handImage || imgs ? null : svgEl('circle', { class: 'skin cap', r: (W * WF[3]) / 2 }, fg);
+        const halo = svgEl('circle', { class: 'halo', r: 0.5, cx: 0, cy: 0, style: 'fill:' + DD.Layout.FINGERS[code].color }, fg);
+        h.fingers[code] = { code, side, spec, g: fg, segs, cap, nail: null, halo, mcp: { x: 0, y: 0 }, home: { x: 0, y: 0 }, tip: { x: 0, y: 0, vx: 0, vy: 0 }, tgt: { x: 0, y: 0 }, active: null, press: 0, shake: 0 };
       });
       return h;
     }
@@ -302,7 +270,8 @@
 
     function applyTint() {
       const t = TINTS[cfg.tint];
-      Object.keys(t).forEach((k) => layer.style.setProperty('--skin-' + k, t[k]));
+      layer.style.setProperty('--hand-fill', t.fill);
+      layer.style.setProperty('--hand-line', t.line);
       layer.style.opacity = String(cfg.opacity);
       layer.classList.toggle('lite', perfLevel >= 1);
       layer.hidden = !cfg.visible;
@@ -322,6 +291,8 @@
       const extra = EXTRA_U * u;
       layer.style.height = r.height + extra + 'px';
       root.style.marginBottom = extra + 'px'; // réserve la place des paumes sous le clavier
+      st.totalH = (r.height + extra) / u;
+      if (st.morph) st.morph.setAttribute('radius', (1.3 / u).toFixed(4)); // contour d'environ 1,3 px
       svg.setAttribute('viewBox', '0 0 ' + r.width / u + ' ' + (r.height + extra) / u);
       svg.setAttribute('width', r.width);
       svg.setAttribute('height', r.height + extra);
@@ -353,43 +324,18 @@
       const T = st.rest.thumbs[side];
       h.thumb.base = { x: T.base.x, y: T.base.y };
       h.thumb.home = { x: T.tipRest.x, y: T.tipRest.y };
-      // paume : passe par les articulations des doigts, s'élargit côté pouce, s'amincit vers le poignet
+      // Paume : part des articulations des doigts, s'élargit côté pouce, descend sous le clavier et finit par un poignet arrondi.
       const ms = codes.map((c) => h.fingers[c].mcp);
-      const avgY = ms.reduce((s, p) => s + p.y, 0) / 4;
-      const yW = avgY + 2.3; // poignet
-      const dir = side === 'L' ? 1 : -1; // le pouce est du côté de l'index
-      const first = ms[0];
-      const last = ms[3];
-      const outer = -dir; // côté de l'auriculaire
-      const pts = [
-        { x: first.x + outer * 0.52, y: first.y + 0.15 },
-        ...ms.map((m) => ({ x: m.x, y: m.y - 0.14 })),
-        { x: last.x + dir * 0.5, y: last.y + 0.05 },
-        { x: last.x + dir * 0.92, y: avgY + 1.25 },
-        { x: last.x + dir * 0.3, y: yW },
-        { x: last.x + dir * 0.15, y: yW + 1.7 },
-        { x: first.x + outer * 0.0, y: yW + 1.7 },
-        { x: first.x + outer * 0.12, y: yW },
-        { x: first.x + outer * 0.62, y: avgY + 1.1 },
-      ];
-      if (h.palmPath) {
-        h.palmPath.setAttribute('d', closedSpline(pts));
-        h.thenar.setAttribute('cx', last.x + dir * 0.45);
-        h.thenar.setAttribute('cy', avgY + 1.0);
-        h.thenar.setAttribute('rx', 0.85);
-        h.thenar.setAttribute('ry', 1.25);
-        h.knuckles.forEach((k, i) => {
-          k.setAttribute('cx', ms[i].x);
-          k.setAttribute('cy', ms[i].y + 0.05);
-          k.setAttribute('rx', 0.42);
-          k.setAttribute('ry', 0.3);
-        });
-        const mid = (first.x + last.x) / 2;
-        h.creases[0].setAttribute('d', 'M ' + (mid - 1.4 * dir) + ' ' + (avgY + 0.75) + ' Q ' + mid + ' ' + (avgY + 1.15) + ' ' + (mid + 1.4 * dir) + ' ' + (avgY + 0.7));
-        h.creases[1].setAttribute('d', 'M ' + (mid - 1.0 * dir) + ' ' + (avgY + 1.5) + ' Q ' + (mid + 0.2 * dir) + ' ' + (avgY + 1.8) + ' ' + (mid + 1.3 * dir) + ' ' + (avgY + 1.45));
-        h.fade.setAttribute('y1', yW - 0.2);
-        h.fade.setAttribute('y2', yW + 1.7);
-      }
+      const avgY = ms.reduce((q, p) => q + p.y, 0) / 4;
+      const sgn = side === 'L' ? 1 : -1; // le pouce est du côté de l'index : à droite pour la main gauche
+      const ordered = side === 'L' ? ms : ms.slice().reverse(); // de l'auriculaire vers l'index
+      const o = ordered[0].x; // côté auriculaire
+      const span = Math.abs(ordered[3].x - o);
+      const yB = Math.max(avgY + 3, (st.totalH || 0) - 0.14); // bas du poignet : tout en bas de la zone libre sous le clavier
+      const Hh = yB - avgY;
+      const P = (dx, fy) => ({ x: o + sgn * dx, y: avgY + Hh * fy });
+      const pts = [P(-0.42, 0.02), ...ordered.map((m) => ({ x: m.x, y: m.y - 0.2 })), P(span + 0.46, 0.04), P(span + 1.0, 0.3), P(span + 0.92, 0.62), P(span + 0.42, 0.9), P(span / 2 + 0.1, 1.0), P(-0.2, 0.92), P(-0.66, 0.62), P(-0.62, 0.3)];
+      if (h.palmPath) h.palmPath.setAttribute('d', closedSpline(pts));
       if (h.handImage) {
         const c = images.cfg;
         const w = (c.hands.width || 6) * (c.hands.scale || 1);
@@ -435,10 +381,7 @@
         off += pose.proj[i];
       }
       F.halo.setAttribute('cy', (-pose.distance).toFixed(4));
-      // ongle au bout du doigt ; un peu plus net quand la dernière phalange est moins penchée
-      const s3 = pose.proj[2] / (spec.len * spec.seg[2]);
-      F.nail.setAttribute('transform', 'translate(0 ' + (-pose.distance + spec.width * WF[3] * 0.4).toFixed(4) + ')');
-      F.nail.setAttribute('opacity', clamp(0.55 + s3 * 0.9, 0.55, 1).toFixed(3));
+      if (F.cap) F.cap.setAttribute('cy', (-pose.distance + (spec.width * WSCALE * WF[3]) / 2 * 0.2).toFixed(4));
     }
 
     function drawThumb(T, h) {
@@ -446,13 +389,23 @@
       let ty = T.tip.y;
       if (T.press > 0) ty += DIP * 1.2 * T.press;
       if (T.shake > 0) tx += Math.sin(T.shake * 28) * SHAKE * T.shake;
+      if (T.shape) {
+        const dx = tx - T.base.x;
+        const dy = ty - T.base.y;
+        const L = Math.max(0.4, Math.hypot(dx, dy));
+        const r = THUMB_W / 2;
+        T.shape.setAttribute('transform', 'translate(' + T.base.x.toFixed(4) + ' ' + T.base.y.toFixed(4) + ') rotate(' + ((Math.atan2(dx, -dy) * 180) / Math.PI).toFixed(3) + ')');
+        T.shape.setAttribute('d', 'M ' + -r + ' 0 L ' + -r + ' ' + -L.toFixed(4) + ' A ' + r + ' ' + r + ' 0 0 1 ' + r + ' ' + -L.toFixed(4) + ' L ' + r + ' 0 A ' + r + ' ' + r + ' 0 0 1 ' + -r + ' 0 Z');
+        T.halo.setAttribute('cx', tx.toFixed(4));
+        T.halo.setAttribute('cy', ty.toFixed(4));
+        return;
+      }
       const pose = M.thumbPose(T.base, { x: tx, y: ty }, h.side);
       const deg = (a) => ((a * 180) / Math.PI).toFixed(3);
       T.segs[0].g.setAttribute('transform', 'translate(' + T.base.x.toFixed(4) + ' ' + T.base.y.toFixed(4) + ') rotate(' + deg(pose.a1) + ')');
       T.segs[1].g.setAttribute('transform', 'translate(' + pose.p1.x.toFixed(4) + ' ' + pose.p1.y.toFixed(4) + ') rotate(' + deg(pose.a2) + ')');
       T.halo.setAttribute('cx', pose.tip.x.toFixed(4));
       T.halo.setAttribute('cy', pose.tip.y.toFixed(4));
-      T.nail.setAttribute('transform', 'translate(' + pose.p1.x.toFixed(4) + ' ' + pose.p1.y.toFixed(4) + ') rotate(' + deg(pose.a2) + ') translate(0 ' + (-T.spec.l2 + T.spec.w2 * 0.36).toFixed(4) + ')');
     }
 
     function drawHand(h) {

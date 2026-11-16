@@ -41,8 +41,9 @@
         testFingers: 10,
         // Mains réalistes superposées au clavier visuel
         showHands: true,
-        handOpacity: 50, // 20 à 80 %
-        handTint: 'moyenne', // claire | moyenne | foncee | fantome
+        handOpacity: 62, // 20 à 80 %
+        handTint: 'blanc', // blanc | claire | moyenne | foncee | fantome
+        handStyle: 2, // 2 = mains blanches translucides (le dessin a changé : les anciens réglages de teinte sont remis une fois)
         handSpeed: 'normal', // lent | normal | rapide
         demoSpeed: 'normal', // vitesse du mode démo : lent | normal
         unlockAll: false, // « Tout déverrouiller » : tous les modules et toutes les leçons sont ouverts (rien n'est validé pour autant)
@@ -99,7 +100,12 @@
       if (typeof s.unlockAll === 'boolean') out.unlockAll = s.unlockAll;
       if (typeof s.showHands === 'boolean') out.showHands = s.showHands;
       out.handOpacity = Math.min(80, Math.max(20, Math.round(num(s.handOpacity, out.handOpacity))));
-      if (['claire', 'moyenne', 'foncee', 'fantome'].includes(s.handTint)) out.handTint = s.handTint;
+      if (['blanc', 'claire', 'moyenne', 'foncee', 'fantome'].includes(s.handTint)) out.handTint = s.handTint;
+      if (s.handStyle !== 2) {
+        out.handTint = 'blanc'; // ancien dessin : on repart du nouveau style par défaut (une seule fois)
+        out.handOpacity = 62;
+      }
+      out.handStyle = 2;
       if (['lent', 'normal', 'rapide'].includes(s.handSpeed)) out.handSpeed = s.handSpeed;
       if (['lent', 'normal'].includes(s.demoSpeed)) out.demoSpeed = s.demoSpeed;
       if (isObj(s.workshop)) {

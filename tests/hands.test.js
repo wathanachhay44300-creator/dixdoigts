@@ -323,23 +323,23 @@ test('pouces : l\'espace est à portée des deux pouces, AltGr du pouce droit', 
 
 const siteWith = (storage) => loadSite(['util.js', 'store.js', 'layout.js'], { storage: storage || {} });
 
-test('réglages des mains : valeurs par défaut (mains affichées, 50 %, peau moyenne, vitesse normale)', () => {
+test('réglages des mains : valeurs par défaut (mains affichées, 62 %, blanc translucide, vitesse normale)', () => {
   const s = siteWith().Store.state.settings;
   assert.equal(s.showHands, true);
-  assert.equal(s.handOpacity, 50);
-  assert.equal(s.handTint, 'moyenne');
+  assert.equal(s.handOpacity, 62);
+  assert.equal(s.handTint, 'blanc');
   assert.equal(s.handSpeed, 'normal');
   assert.equal(s.demoSpeed, 'normal');
 });
 
 test('réglages des mains : opacité bornée de 20 à 80 %, valeurs inconnues ignorées', () => {
-  const load = (settings) => siteWith({ 'dixdoigts:v1': JSON.stringify({ v: 1, schema: 3, settings, tests: [] }) }).Store.state.settings;
+  const load = (settings) => siteWith({ 'dixdoigts:v1': JSON.stringify({ v: 1, schema: 3, settings: Object.assign({ handStyle: 2 }, settings), tests: [] }) }).Store.state.settings;
   assert.equal(load({ handOpacity: 5 }).handOpacity, 20);
   assert.equal(load({ handOpacity: 99 }).handOpacity, 80);
   assert.equal(load({ handOpacity: 35.4 }).handOpacity, 35);
-  assert.equal(load({ handOpacity: 'beaucoup' }).handOpacity, 50);
-  for (const tint of ['claire', 'moyenne', 'foncee', 'fantome']) assert.equal(load({ handTint: tint }).handTint, tint);
-  assert.equal(load({ handTint: 'vert' }).handTint, 'moyenne');
+  assert.equal(load({ handOpacity: 'beaucoup' }).handOpacity, 62);
+  for (const tint of ['blanc', 'claire', 'moyenne', 'foncee', 'fantome']) assert.equal(load({ handTint: tint }).handTint, tint);
+  assert.equal(load({ handTint: 'vert' }).handTint, 'blanc');
   for (const v of ['lent', 'normal', 'rapide']) assert.equal(load({ handSpeed: v }).handSpeed, v);
   assert.equal(load({ handSpeed: 'éclair' }).handSpeed, 'normal');
   assert.equal(load({ demoSpeed: 'lent' }).demoSpeed, 'lent');
@@ -375,8 +375,8 @@ test('migration : les réglages et les données d\'avant les mains sont conserv�
   assert.equal(JSON.stringify(Object.keys(st.badges)), '["first-lesson"]');
   // les mains : valeurs par défaut
   assert.equal(st.settings.showHands, true);
-  assert.equal(st.settings.handOpacity, 50);
-  assert.equal(st.settings.handTint, 'moyenne');
+  assert.equal(st.settings.handOpacity, 62);
+  assert.equal(st.settings.handTint, 'blanc');
   assert.equal(st.settings.handSpeed, 'normal');
 });
 
@@ -401,4 +401,15 @@ test('disposition : la touche AltGr est à droite de la barre d\'espace, tapée 
   // les anciens textes ne changent pas : aucun caractère courant ne demande AltGr
   const mac = LAYOUTS[0];
   for (const ch of 'azertyAZERTY0123456789 .,;:!?\'"()-éèàçùêâîôû') assert.ok(!(mac.hint(ch).keys || []).includes('AltGr'), ch);
+});
+
+test('nouveau style des mains : les anciens réglages de teinte et d\'opacité sont remis une seule fois', () => {
+  const old = siteWith({ 'dixdoigts:v1': JSON.stringify({ v: 1, schema: 3, settings: { handTint: 'moyenne', handOpacity: 35 }, tests: [] }) }).Store.state.settings;
+  assert.equal(old.handTint, 'blanc');
+  assert.equal(old.handOpacity, 62);
+  assert.equal(old.handStyle, 2);
+  // ensuite, le choix de l'utilisateur est respecté
+  const kept = siteWith({ 'dixdoigts:v1': JSON.stringify({ v: 1, schema: 3, settings: { handStyle: 2, handTint: 'foncee', handOpacity: 35 }, tests: [] }) }).Store.state.settings;
+  assert.equal(kept.handTint, 'foncee');
+  assert.equal(kept.handOpacity, 35);
 });

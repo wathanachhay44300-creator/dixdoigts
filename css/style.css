@@ -277,25 +277,24 @@ th { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; color
 .krow { display: flex; }
 .kcell { flex: var(--w) 1 0; padding: 3px; min-width: 0; }
 .key {
-  position: relative; height: 46px; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; height: 46px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;
   font-weight: 700; font-size: 15px; line-height: 1.1;
-  background: color-mix(in srgb, var(--fc) 20%, #fff);
-  border: 1px solid color-mix(in srgb, var(--fc) 45%, #d9d6cc);
-  border-bottom-width: 3px;
+  /* pastel : une couleur par doigt ; lettre foncée de la même teinte */
+  background: color-mix(in srgb, var(--fc) 40%, #fff);
+  color: color-mix(in srgb, var(--fc) 42%, #161a26);
+  border: 1px solid color-mix(in srgb, var(--fc) 40%, #fff);
   transition: transform 0.08s, background 0.1s, box-shadow 0.1s;
 }
-.key .ks { font-size: 11px; opacity: 0.65; }
+.key .ks { font-size: 11px; opacity: 0.7; }
 .key .kb { font-size: 14px; }
-.key .kl { font-size: 11px; font-weight: 600; color: var(--muted); }
-.key.special { background: #ebe9e1; border-color: #d6d3c8; }
-.key.special.filler { border-left-color: transparent; border-top-color: #ebe9e1; }
-.key[data-id='Space'] { background: color-mix(in srgb, var(--fc) 16%, #fff); border-color: color-mix(in srgb, var(--fc) 40%, #d6d3c8); }
+.key .kl { font-size: 11px; font-weight: 600; color: inherit; opacity: 0.8; }
+/* touches grises : Maj, Tab, Verr. Maj, Entrée, Retour arrière, espace */
+.key.special, .key[data-id='Space'] { background: #dfe2e7; border-color: #dfe2e7; color: #3a4252; }
+.key.special.filler { border-left-color: transparent; border-top-color: #dfe2e7; }
 .key.bump::after { content: ''; position: absolute; bottom: 6px; width: 14px; height: 3px; border-radius: 2px; background: rgba(28, 35, 51, 0.45); }
-.key.next { background: var(--fc); border-color: color-mix(in srgb, var(--fc) 65%, #000); color: #10131c; transform: translateY(-2px); box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc) 35%, transparent), 0 6px 14px rgba(0, 0, 0, 0.18); z-index: 1; }
-.key.next .kl, .key.next .ks { color: #10131c; opacity: 0.8; }
-.key.next.mod { background: color-mix(in srgb, var(--fc) 70%, #fff); }
+.key.next { outline: 3.5px solid #262a37; outline-offset: -3.5px; z-index: 1; }
 .kbd.has-focus .key { opacity: 0.35; }
-.kbd.has-focus .key.focus { opacity: 1; background: var(--fc); border-color: color-mix(in srgb, var(--fc) 65%, #000); color: #10131c; }
+.kbd.has-focus .key.focus { opacity: 1; box-shadow: inset 0 0 0 2.5px color-mix(in srgb, var(--fc) 75%, #000); }
 .key.flash-ok { background: color-mix(in srgb, var(--good) 45%, #fff); }
 .key.flash-bad { background: color-mix(in srgb, var(--bad) 55%, #fff); animation: shake 0.22s; }
 .kbd.heat .key { background: color-mix(in srgb, #e5484d calc(var(--heat, 0) * 100%), #f3f1ea); border-color: #d6d3c8; color: color-mix(in srgb, #fff calc(var(--heat, 0) * 100%), var(--ink)); }
@@ -304,20 +303,19 @@ th { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; color
 
 /* ---------- Mains réalistes sur le clavier ---------- */
 .kbd { position: relative; }
-.hands-layer { position: absolute; left: 0; top: 0; width: 100%; pointer-events: none; z-index: 4; opacity: 0.5; }
+.hands-layer { position: absolute; left: 0; top: 0; width: 100%; pointer-events: none; z-index: 4; opacity: 0.62; }
 .hands-layer[hidden] { display: none; }
 .hands-svg { display: block; overflow: visible; pointer-events: none; }
 .hands-svg * { pointer-events: none; }
-.hands-svg .skin { stroke: var(--skin-line); stroke-opacity: 0.62; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.hands-svg .crease { stroke: var(--skin-line); stroke-opacity: 0.3; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.hands-svg .nail rect { stroke: var(--skin-line); stroke-opacity: 0.28; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.hands-svg .skin { fill: var(--hand-fill); stroke: none; }
 .hands-svg .halo { opacity: 0; transition: opacity 0.15s; }
-.hands-svg .finger.hl .halo { opacity: 0.5; }
-.hands-svg .finger.hl .skin { stroke: var(--fc); stroke-opacity: 1; stroke-width: 2.2; }
+.hands-svg .finger.hl .halo { opacity: 0.38; }
+.hands-svg .finger.hl .skin { fill: color-mix(in srgb, var(--fc) 38%, var(--hand-fill)); }
 .hands-svg .finger.dim { opacity: 0.4; }
-.hands-svg .finger.mark .skin { stroke: var(--fc); stroke-opacity: 0.85; stroke-width: 1.6; }
-.hands-layer.lite .hand { filter: none !important; }
-.hands-layer.lite .shade { display: none; }
+.hands-svg .finger.mark .skin { fill: color-mix(in srgb, var(--fc) 24%, var(--hand-fill)); }
+/* machine lente : plus de filtre, un trait fin sur chaque forme à la place */
+.hands-layer.lite .hand, .hands-layer.lite .thumb { filter: none !important; }
+.hands-layer.lite .skin { stroke: var(--hand-line); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .hand-preview { margin: 10px 0 4px; }
 .hand-preview .kbd { max-width: 560px; }
 .demo-bar { display: inline-flex; align-items: center; gap: 8px; }

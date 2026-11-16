@@ -111,3 +111,9 @@ Tout est enregistré dans `localStorage` sous la clé `dixdoigts:v1` : leçons, 
 - Correction : `js/deadkeys.js` (machine à états pure, testée dans `tests/deadkeys.test.js`) + un champ caché qui reçoit la frappe (`js/typing.js`). Elle accepte la composition du navigateur, une touche déjà composée, ou, en secours, la table `^`/`¨` + voyelle.
 - Diagnostic : page `#/diagnostic` (liée depuis Réglages), qui affiche en direct keydown / beforeinput / input / composition* et ce que DixDoigts en comprend.
 - Corpus : tout en NFC ; `node tests/validate-corpus.js` échoue sur un texte non NFC ou un accent décomposé.
+
+## Style des mains et du clavier (captures dans `docs/`)
+
+- Mains en SVG par couches (un groupe par doigt et par phalange) : formes pleines blanches, **sans dégradé ni ombre**, contour gris fin tracé autour de la silhouette entière (filtre SVG, donc aucune ligne aux articulations), translucidité = opacité du calque (62 % par défaut). Paumes qui descendent sous le clavier avec un poignet arrondi, pouces arrondis sur la barre d'espace. Pas de 3D, pas de three.js.
+- Teintes : blanc translucide (défaut), peau claire, moyenne, foncée, fantôme bleu. Les anciens réglages de teinte et d'opacité sont remis une seule fois (`handStyle: 2`).
+- Clavier : touches arrondies en pastel (une couleur par doigt, lettres foncées de la même teinte), touches grises pour Maj, Tab, Verr. Maj, Entrée, Retour arrière et espace, touche attendue cerclée d'un épais contour sombre.
